@@ -78,49 +78,89 @@ Regions are views, never copies, so reassembly is a sort.
 
 ```mermaid
 flowchart TD
-    START(["goselect-docproc run<br/>or eval/report.py"]) --> ANALYZE
+    START["goselect-docproc run<br/>or eval/report.py"]
+    ANALYZE["producer.analyze"]
+    ENGINE{"which engine?"}
+    DI["layout.py<br/>DI Layout call, cached by SHA-256<br/>figure crops persisted immediately"]
+    CU["content_understanding.py<br/>classify and split in one analyzer call"]
+    SEC["sections.py<br/>DI section tree gives headings, levels<br/>and document boundaries"]
+    CLS["segmentation.py<br/>profile pages, classify, build segments"]
+    REG["regions.py<br/>intra-page split by span subtraction<br/>claim order and containment"]
+    MAN["manifest.py build_manifest<br/>coverage proof:<br/>claimed + furniture + unexplained = total"]
+    LEX["reconcile.py harvest<br/>tag lexicon from SCHEDULE segments"]
+    WI["manifest.py work_items<br/>one WorkItem per segment, a pointer not a payload"]
+    KIND{"content type?"}
+    TX["extractors.py TEXT_SCHEMA<br/>no paired_with field"]
+    SC["extractors.py SCHEDULE_SCHEMA"]
+    TILE["tiling.py tile_image<br/>native-resolution tiles"]
+    DR["extractors.py DRAWING_SCHEMA<br/>tags and topology only"]
+    MODEL["models.py AzureOpenAIModel<br/>strict json_schema, Entra auth, retry"]
+    EXP["extractors.expand<br/>flat to domain, parse_quantity in Python"]
+    VAL{"every value grounded?"}
+    DONE["status DONE"]
+    REV["status REVIEW"]
+    MERGE["assemble.py merge<br/>sort by file_ordinal then span_offset"]
+    PREC["precedence, dedupe, conflicts<br/>REVIEW payloads included and flagged"]
+    OUT["JobResult to GoSelect"]
 
-    subgraph PHASE1["Phase 1 — Segmentation · Pipeline.segment · one pass per file"]
-        ANALYZE["producer.analyze"] --> ENGINE{"engine"}
-        ENGINE -->|di-layout| DI["layout.py<br/>DI Layout call · cached by SHA-256<br/>figure crops persisted now, not later"]
-        ENGINE -->|content-understanding| CU["content_understanding.py<br/>classify + split in one analyzer call"]
-        DI --> SEC["sections.py<br/>DI section tree → headings,<br/>levels and document boundaries"]
-        CU --> SEC
-        DI --> CLS["segmentation.py<br/>profile_pages → classify → build_segments"]
-        SEC --> REG["regions.py<br/>intra-page split by span subtraction<br/>claim order · containment"]
-        CLS --> REG
-        CU --> REG
-        REG --> MAN["manifest.py · build_manifest<br/>coverage proof:<br/>claimed + furniture + unexplained == total"]
+    subgraph PHASE1["Phase 1: Segmentation - deterministic, one analyze call per file"]
+        ANALYZE
+        ENGINE
+        DI
+        CU
+        SEC
+        CLS
+        REG
+        MAN
     end
 
-    MAN --> LEX["reconcile.py · harvest<br/>tag lexicon from SCHEDULE segments"]
-    MAN --> WI["manifest.py · work_items<br/>one WorkItem per segment — a pointer, not a payload"]
-
-    subgraph PHASE2["Phase 2 — Extraction · Pipeline.run_all · thread pool here, queue depth in production"]
-        WI --> KIND{"content type"}
-        KIND -->|TEXT| TX["extractors.py · TEXT_SCHEMA<br/>no paired_with field"]
-        KIND -->|SCHEDULE| SC["extractors.py · SCHEDULE_SCHEMA"]
-        KIND -->|DRAWING| TILE["tiling.py · tile_image<br/>native-resolution tiles"]
-        TILE --> DR["extractors.py · DRAWING_SCHEMA<br/>tags and topology only"]
-        TX --> MODEL["models.py · AzureOpenAIModel<br/>strict json_schema · Entra auth · retry"]
-        SC --> MODEL
-        DR --> MODEL
-        MODEL --> EXP["extractors.expand<br/>flat → domain · parse_quantity in Python"]
-        LEX --> EXP
-        EXP --> VAL{"validate.py<br/>every value grounded?"}
-        VAL -->|yes| DONE(["DONE"])
-        VAL -->|no| REV(["REVIEW"])
+    subgraph PHASE2["Phase 2: Extraction - the only phase that calls a model"]
+        KIND
+        TX
+        SC
+        TILE
+        DR
+        MODEL
+        EXP
+        VAL
     end
 
+    subgraph PHASE3["Phase 3: Reconciliation - arithmetic only"]
+        MERGE
+        PREC
+    end
+
+    START --> ANALYZE
+    ANALYZE --> ENGINE
+    ENGINE -->|di-layout| DI
+    ENGINE -->|content-understanding| CU
+    DI --> SEC
+    DI --> CLS
+    CU --> SEC
+    CU --> REG
+    SEC --> REG
+    CLS --> REG
+    REG --> MAN
+    MAN --> LEX
+    MAN --> WI
+    WI --> KIND
+    KIND -->|TEXT| TX
+    KIND -->|SCHEDULE| SC
+    KIND -->|DRAWING| TILE
+    TILE --> DR
+    TX --> MODEL
+    SC --> MODEL
+    DR --> MODEL
+    MODEL --> EXP
+    LEX --> EXP
+    EXP --> VAL
+    VAL -->|yes| DONE
+    VAL -->|no| REV
     DONE --> MERGE
     REV --> MERGE
     MAN --> MERGE
-
-    subgraph PHASE3["Phase 3 — Reconciliation · Pipeline.finish"]
-        MERGE["assemble.py · merge<br/>sort by file_ordinal, span_offset"] --> PREC["precedence · dedupe · conflicts<br/>REVIEW payloads included, flagged"]
-    end
-
-    PREC --> OUT(["JobResult → GoSelect"])
+    MERGE --> PREC
+    PREC --> OUT
 ```
 
 Everything in Phase 1 is deterministic and costs one analyze call per file.
@@ -315,50 +355,101 @@ unsure about to review.
 
 ```mermaid
 flowchart TD
-    subgraph OFFLINE["Offline — runs in CI, never in production"]
-        direction TB
-        PDFS["frozen corpus<br/>15-20 real ABB packages"] --> PIPE["the pipeline"]
-        PIPE --> MF["out/eval/manifests/&lt;doc&gt;.json<br/>segments, section index, coverage"]
-        PIPE --> JB["out/eval/jobs/&lt;doc&gt;.json<br/>extracted payload — optional"]
-        PDFS --> HUMAN["a human reads them once"]
-        HUMAN --> LB["eval/labels/&lt;doc&gt;.json<br/>scan_quality · pages · sections<br/>tags · pairs · headings"]
+    PDFS["frozen corpus<br/>15 to 20 real ABB packages"]
+    PIPE["the pipeline"]
+    MF["out/eval/manifests/DOC.json<br/>segments, section index, coverage"]
+    JB["out/eval/jobs/DOC.json<br/>extracted payload, optional"]
+    HUMAN["a human reads them once"]
+    LB["eval/labels/DOC.json<br/>scan_quality, pages, sections,<br/>tags, pairs, headings"]
+    SD["score_document"]
+    SJ["score_job"]
+    M1["page classification<br/>TP, FP, FN per class, then macro-F1"]
+    M2["segment boundary IoU<br/>labelled runs versus predicted runs"]
+    M3["heading detection<br/>recall finds missed clauses,<br/>precision catches invented ones"]
+    M4["section attribution<br/>digital and scanned scored separately"]
+    M5["coverage<br/>unexplained characters must be zero"]
+    M6["tag and pair precision, recall, F1"]
+    RENDER["render: measured versus GATES"]
+    VERDICT{"every gate met?"}
+    PASSED["exit 0, CI green"]
+    FAILED["exit 1, CI red"]
+    NM["NOT MEASURED<br/>no labelled sample, also blocks release"]
+    CARD["out/eval/scorecard.json<br/>timestamped and diffable"]
+    NEW["new customer package<br/>no label, and never will have one"]
+    RUN["the same pipeline"]
+    SIG["confidence, grounding, coverage proof"]
+    GATE{"confident and grounded?"}
+    GS["straight through to GoSelect"]
+    RQ["human review queue"]
+    CORR["corrections"]
 
-        MF --> SD["score_document"]
-        LB --> SD
-        LB --> SJ["score_job"]
-        JB --> SJ
-
-        SD --> M1["page classification<br/>TP/FP/FN per class → macro-F1"]
-        SD --> M2["segment boundary IoU<br/>labelled runs vs predicted runs"]
-        SD --> M3["heading detection<br/>recall finds missed clauses,<br/>precision catches invented ones"]
-        SD --> M4["section attribution<br/>digital and scanned scored separately"]
-        SD --> M5["coverage<br/>unexplained_chars == 0"]
-        SJ --> M6["tag and pair precision / recall / F1"]
-
-        M1 --> RENDER
-        M2 --> RENDER
-        M3 --> RENDER
-        M4 --> RENDER
-        M5 --> RENDER
-        M6 --> RENDER["render — measured vs GATES"]
-
-        RENDER --> VERDICT{"every gate met?"}
-        VERDICT -->|yes| PASS(["exit 0 — CI green"])
-        VERDICT -->|no| FAIL(["exit 1 — CI red"])
-        VERDICT -->|no labelled sample| NM(["NOT MEASURED<br/>also blocks release"])
-        RENDER --> CARD["out/eval/scorecard.json<br/>timestamped, diffable"]
+    subgraph OFFLINE["Offline: runs in CI, never in production"]
+        PDFS
+        PIPE
+        MF
+        JB
+        HUMAN
+        LB
+        SD
+        SJ
+        M1
+        M2
+        M3
+        M4
+        M5
+        M6
+        RENDER
+        VERDICT
+        PASSED
+        FAILED
+        NM
+        CARD
     end
 
-    subgraph PROD["Production — every upload"]
-        NEW["new customer package<br/>no label, and never will have one"] --> RUN["the same pipeline"]
-        RUN --> SIG["confidence · grounding · coverage proof"]
-        SIG --> GATE{"confident and grounded?"}
-        GATE -->|yes| GS(["straight through to GoSelect"])
-        GATE -->|no| RQ["human review queue"]
-        RQ --> CORR["corrections"]
+    subgraph PROD["Production: every upload"]
+        NEW
+        RUN
+        SIG
+        GATE
+        GS
+        RQ
+        CORR
     end
 
-    CORR -.->|"a correction is a label —<br/>the corpus grows for free"| LB
+    PDFS --> PIPE
+    PIPE --> MF
+    PIPE --> JB
+    PDFS --> HUMAN
+    HUMAN --> LB
+    MF --> SD
+    LB --> SD
+    LB --> SJ
+    JB --> SJ
+    SD --> M1
+    SD --> M2
+    SD --> M3
+    SD --> M4
+    SD --> M5
+    SJ --> M6
+    M1 --> RENDER
+    M2 --> RENDER
+    M3 --> RENDER
+    M4 --> RENDER
+    M5 --> RENDER
+    M6 --> RENDER
+    RENDER --> VERDICT
+    RENDER --> CARD
+    VERDICT -->|yes| PASSED
+    VERDICT -->|no| FAILED
+    VERDICT -->|nothing to measure| NM
+
+    NEW --> RUN
+    RUN --> SIG
+    SIG --> GATE
+    GATE -->|yes| GS
+    GATE -->|no| RQ
+    RQ --> CORR
+    CORR -.->|a correction is a label| LB
 ```
 
 `score_document` never scores what it cannot see: a gate with no labelled sample
