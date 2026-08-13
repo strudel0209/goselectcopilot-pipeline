@@ -423,4 +423,6 @@ Phases 0 and 1 have no dependency on Phase 2 and should start immediately.
 
 ---
 
-*Superseded documents are in `archive/` — nothing was deleted.*
+*Removed in the tidy and recoverable from git history: the Mistral and hybrid
+producers, the one-off bake-off scripts, `requirements.txt`, and the superseded
+documents now folded into this file.*

@@ -13,12 +13,11 @@ is one page:
 So this producer emits **whole-page regions** and cannot separate a schedule
 from an inset diagram on the same sheet. On the ABB sample, **15 of 20 pages
 carry more than one content kind and 4 carry all three** — so on that corpus this
-producer structurally cannot match the DI or Mistral paths for intra-page
+producer structurally cannot match the DI path for intra-page
 routing. Whether that matters is precisely what the bench-off measures.
 
 Mitigation, and the reason this producer is still a serious contender: run it as
-the **router** and keep DI Layout for intra-page geometry. See
-``HybridCUProducer``.
+the **router** and keep DI Layout for intra-page geometry.
 """
 
 from __future__ import annotations

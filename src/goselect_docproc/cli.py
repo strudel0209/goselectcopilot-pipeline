@@ -50,43 +50,14 @@ def _layout_client(cache_dir: Path) -> LayoutClient:
 
 def _producer(name: str, cache_dir: Path):
     """Swap the front half by configuration. The spine never changes."""
-    from .producers import (
-        ContentUnderstandingProducer,
-        DILayoutProducer,
-        HybridCUProducer,
-        MistralBlocksProducer,
-    )
+    from .producers import ContentUnderstandingProducer, DILayoutProducer
 
     if name == "di-layout":
         return DILayoutProducer(_layout_client(cache_dir))
 
-    if name == "mistral-blocks":
-        from .producers.mistral_blocks import MistralOCRRestClient
-
-        key = os.getenv("MISTRAL_API_KEY")
-        if not key:
-            raise SystemExit("MISTRAL_API_KEY is not set")
-        client = MistralOCRRestClient(
-            api_key=key,
-            base_url=os.getenv("MISTRAL_BASE_URL") or "https://api.mistral.ai",
-            path=os.getenv("MISTRAL_OCR_PATH", "/v1/ocr"),
-        )
-        return MistralBlocksProducer(
-            client, model=os.getenv("MISTRAL_OCR_MODEL", "mistral-ocr-latest")
-        )
-
     if name == "content-understanding":
         return ContentUnderstandingProducer(
             _content_understanding_client(), analyzer_id=os.getenv("CU_ANALYZER_ID", DEFAULT_ANALYZER_ID)
-        )
-
-    if name == "hybrid-cu-di":
-        return HybridCUProducer(
-            router=ContentUnderstandingProducer(
-                _content_understanding_client(),
-                analyzer_id=os.getenv("CU_ANALYZER_ID", DEFAULT_ANALYZER_ID),
-            ),
-            geometry=DILayoutProducer(_layout_client(cache_dir)),
         )
 
     raise SystemExit(f"unknown producer {name!r}; available: {available_producers()}")

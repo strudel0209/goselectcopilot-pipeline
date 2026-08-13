@@ -8,7 +8,7 @@ measurement rather than by argument.
 
     bytes ──▶ [ SegmentProducer ] ──▶ DocumentAnalysis ──▶ spine ──▶ JobResult
                      ▲
-        di-layout · mistral-blocks · content-understanding
+        di-layout · content-understanding
 
 A producer must deliver four things. Everything downstream depends only on these:
 

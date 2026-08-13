@@ -1,7 +1,7 @@
 """Manifest construction — the contract the orchestrator persists.
 
 Its shape is **independent of which producer made the segments**. That is the
-whole point: DI Layout today, Mistral blocks or Content Understanding tomorrow,
+whole point: DI Layout today, Content Understanding tomorrow,
 no downstream change.
 """
 
