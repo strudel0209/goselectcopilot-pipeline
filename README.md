@@ -57,7 +57,7 @@ instructs you to reconcile across files.
 
 ## 2. What the pipeline does
 
-Eight stages, ~2,600 lines.
+Eight stages, ~4,200 lines across 16 modules.
 
 | Stage | Input | Output | Module |
 |---|---|---|---|
@@ -73,6 +73,58 @@ Eight stages, ~2,600 lines.
 **Split the index, not the bytes.** One analyze call per file produces one
 immutable `content` string; every region is a `(offset, length)` range over it.
 Regions are views, never copies, so reassembly is a sort.
+
+### Execution order
+
+```mermaid
+flowchart TD
+    START(["goselect-docproc run<br/>or eval/report.py"]) --> ANALYZE
+
+    subgraph PHASE1["Phase 1 — Segmentation · Pipeline.segment · one pass per file"]
+        ANALYZE["producer.analyze"] --> ENGINE{"engine"}
+        ENGINE -->|di-layout| DI["layout.py<br/>DI Layout call · cached by SHA-256<br/>figure crops persisted now, not later"]
+        ENGINE -->|content-understanding| CU["content_understanding.py<br/>classify + split in one analyzer call"]
+        DI --> SEC["sections.py<br/>DI section tree → headings,<br/>levels and document boundaries"]
+        CU --> SEC
+        DI --> CLS["segmentation.py<br/>profile_pages → classify → build_segments"]
+        SEC --> REG["regions.py<br/>intra-page split by span subtraction<br/>claim order · containment"]
+        CLS --> REG
+        CU --> REG
+        REG --> MAN["manifest.py · build_manifest<br/>coverage proof:<br/>claimed + furniture + unexplained == total"]
+    end
+
+    MAN --> LEX["reconcile.py · harvest<br/>tag lexicon from SCHEDULE segments"]
+    MAN --> WI["manifest.py · work_items<br/>one WorkItem per segment — a pointer, not a payload"]
+
+    subgraph PHASE2["Phase 2 — Extraction · Pipeline.run_all · thread pool here, queue depth in production"]
+        WI --> KIND{"content type"}
+        KIND -->|TEXT| TX["extractors.py · TEXT_SCHEMA<br/>no paired_with field"]
+        KIND -->|SCHEDULE| SC["extractors.py · SCHEDULE_SCHEMA"]
+        KIND -->|DRAWING| TILE["tiling.py · tile_image<br/>native-resolution tiles"]
+        TILE --> DR["extractors.py · DRAWING_SCHEMA<br/>tags and topology only"]
+        TX --> MODEL["models.py · AzureOpenAIModel<br/>strict json_schema · Entra auth · retry"]
+        SC --> MODEL
+        DR --> MODEL
+        MODEL --> EXP["extractors.expand<br/>flat → domain · parse_quantity in Python"]
+        LEX --> EXP
+        EXP --> VAL{"validate.py<br/>every value grounded?"}
+        VAL -->|yes| DONE(["DONE"])
+        VAL -->|no| REV(["REVIEW"])
+    end
+
+    DONE --> MERGE
+    REV --> MERGE
+    MAN --> MERGE
+
+    subgraph PHASE3["Phase 3 — Reconciliation · Pipeline.finish"]
+        MERGE["assemble.py · merge<br/>sort by file_ordinal, span_offset"] --> PREC["precedence · dedupe · conflicts<br/>REVIEW payloads included, flagged"]
+    end
+
+    PREC --> OUT(["JobResult → GoSelect"])
+```
+
+Everything in Phase 1 is deterministic and costs one analyze call per file.
+Phase 2 is the only place a model is called. Phase 3 is arithmetic.
 
 ---
 
@@ -261,6 +313,58 @@ papers, not pipeline inputs. A production job has no label and never will: it
 runs, emits confidence, grounding and a coverage proof, and routes what it is
 unsure about to review.
 
+```mermaid
+flowchart TD
+    subgraph OFFLINE["Offline — runs in CI, never in production"]
+        direction TB
+        PDFS["frozen corpus<br/>15-20 real ABB packages"] --> PIPE["the pipeline"]
+        PIPE --> MF["out/eval/manifests/&lt;doc&gt;.json<br/>segments, section index, coverage"]
+        PIPE --> JB["out/eval/jobs/&lt;doc&gt;.json<br/>extracted payload — optional"]
+        PDFS --> HUMAN["a human reads them once"]
+        HUMAN --> LB["eval/labels/&lt;doc&gt;.json<br/>scan_quality · pages · sections<br/>tags · pairs · headings"]
+
+        MF --> SD["score_document"]
+        LB --> SD
+        LB --> SJ["score_job"]
+        JB --> SJ
+
+        SD --> M1["page classification<br/>TP/FP/FN per class → macro-F1"]
+        SD --> M2["segment boundary IoU<br/>labelled runs vs predicted runs"]
+        SD --> M3["heading detection<br/>recall finds missed clauses,<br/>precision catches invented ones"]
+        SD --> M4["section attribution<br/>digital and scanned scored separately"]
+        SD --> M5["coverage<br/>unexplained_chars == 0"]
+        SJ --> M6["tag and pair precision / recall / F1"]
+
+        M1 --> RENDER
+        M2 --> RENDER
+        M3 --> RENDER
+        M4 --> RENDER
+        M5 --> RENDER
+        M6 --> RENDER["render — measured vs GATES"]
+
+        RENDER --> VERDICT{"every gate met?"}
+        VERDICT -->|yes| PASS(["exit 0 — CI green"])
+        VERDICT -->|no| FAIL(["exit 1 — CI red"])
+        VERDICT -->|no labelled sample| NM(["NOT MEASURED<br/>also blocks release"])
+        RENDER --> CARD["out/eval/scorecard.json<br/>timestamped, diffable"]
+    end
+
+    subgraph PROD["Production — every upload"]
+        NEW["new customer package<br/>no label, and never will have one"] --> RUN["the same pipeline"]
+        RUN --> SIG["confidence · grounding · coverage proof"]
+        SIG --> GATE{"confident and grounded?"}
+        GATE -->|yes| GS(["straight through to GoSelect"])
+        GATE -->|no| RQ["human review queue"]
+        RQ --> CORR["corrections"]
+    end
+
+    CORR -.->|"a correction is a label —<br/>the corpus grows for free"| LB
+```
+
+`score_document` never scores what it cannot see: a gate with no labelled sample
+reports **NOT MEASURED** rather than `0.000`, because a gate that fails because
+nothing was measured hides the gates that really failed.
+
 | Gate | Required | Measured on Howey |
 |---|---|---|
 | Page classification macro-F1 | 0.85 | **1.000** |
@@ -318,7 +422,7 @@ pip install -e . --no-deps --no-build-isolation   # local, no network
 cp .env.example .env                     # fill in the two endpoints
 az login                                 # DefaultAzureCredential
 
-pytest -q                                # 110 tests, no Azure, no spend
+pytest -q                                # 102 tests, no Azure, no spend
 ```
 
 | Command | Cost | Purpose |
