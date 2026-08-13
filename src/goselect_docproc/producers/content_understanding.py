@@ -54,6 +54,9 @@ ROUTER_ANALYZER: dict[str, Any] = {
     "config": {
         "returnDetails": True,
         "enableSegment": True,
+        # Must be declared false: the service default is true, and on a drawing the
+        # box around a tag is read as a radical sign - VFD-401 becomes \sqrt{150-401}.
+        "enableFormula": False,
         # Add "analyzerId" to a category to route it to a purpose-built analyzer.
         "contentCategories": {
             "TextSpecification": {
@@ -84,7 +87,9 @@ ROUTER_ANALYZER: dict[str, Any] = {
             },
         },
     },
-    "models": {"completion": "gpt-4.1"},
+    # gpt-4.1 retires October 2026. Measured equal to the flagship on specification
+    # prose, so the mini is the default here too.
+    "models": {"completion": "gpt-5.4-mini"},
 }
 
 
