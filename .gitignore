@@ -1,0 +1,18 @@
+# Secrets
+.env
+
+# Customer documents - never commit these
+*.pdf
+*.docx
+sample_docs/*.pdf
+
+# Regenerable
+.cache/
+out/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+*.egg-info/
+build/
+dist/

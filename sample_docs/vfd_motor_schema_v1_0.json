@@ -1,0 +1,341 @@
+{
+  "schema_version": "1_0",
+  "schema_name": "vfd_motor_schema",
+  "description": "Schema for extracting VFD-Motor pairs from application spec documents - combines VFD and motor specifications for each drive system",
+  "json_schema": {
+    "type": "object",
+    "properties": {
+      "vfd_motor_pairs": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "type": ["string", "null"],
+              "description": "Equipment tag, identifier, or name for this VFD-Motor pair"
+            },
+            "location": {
+              "type": ["string", "null"],
+              "description": "Physical location or area where this equipment is installed"
+            },
+            "application": {
+              "type": ["string", "null"],
+              "description": "Application or load type (e.g., pump, fan, conveyor, compressor)"
+            },
+            "vfd": {
+              "type": "object",
+              "description": "Variable Frequency Drive specifications",
+              "properties": {
+                "product_name": {
+                  "type": ["string", "null"],
+                  "description": "Official VFD product name or identifier"
+                },
+                "manufacturer": {
+                  "type": ["string", "null"],
+                  "description": "VFD manufacturer name"
+                },
+                "model_number": {
+                  "type": ["string", "null"],
+                  "description": "Model, part number, or SKU"
+                },
+                "quantity": {
+                  "type": ["number", "null"],
+                  "description": "Quantity of VFDs"
+                },
+                "electrical": {
+                  "type": "object",
+                  "properties": {
+                    "input_voltage": {
+                      "type": "object",
+                      "properties": {
+                        "value": {"type": ["number", "string", "null"], "description": "Input voltage value"},
+                        "unit": {"type": ["string", "null"], "description": "Voltage unit (V, kV)"},
+                        "details": {"type": ["string", "null"], "description": "Additional voltage details"}
+                      },
+                      "required": ["value", "unit", "details"],
+                      "additionalProperties": false
+                    },
+                    "input_current": {
+                      "type": "object",
+                      "properties": {
+                        "value": {"type": ["number", "null"], "description": "Input current value"},
+                        "unit": {"type": ["string", "null"], "description": "Current unit (A, mA)"},
+                        "details": {"type": ["string", "null"], "description": "Additional current details"}
+                      },
+                      "required": ["value", "unit", "details"],
+                      "additionalProperties": false
+                    },
+                    "input_phases": {
+                      "type": "object",
+                      "properties": {
+                        "value": {"type": ["number", "null"], "description": "Number of input phases (1 or 3)"},
+                        "details": {"type": ["string", "null"], "description": "Additional phase details"}
+                      },
+                      "required": ["value", "details"],
+                      "additionalProperties": false
+                    },
+                    "input_frequency": {
+                      "type": "object",
+                      "properties": {
+                        "value": {"type": ["number", "null"], "description": "Input frequency from grid"},
+                        "unit": {"type": ["string", "null"], "description": "Frequency unit (Hz)"},
+                        "details": {"type": ["string", "null"], "description": "Additional frequency details (e.g., 50/60Hz)"}
+                      },
+                      "required": ["value", "unit", "details"],
+                      "additionalProperties": false
+                    },
+                    "output_voltage": {
+                      "type": "object",
+                      "properties": {
+                        "value": {"type": ["number", "string", "null"], "description": "Output voltage to motor"},
+                        "unit": {"type": ["string", "null"], "description": "Voltage unit (V, kV)"},
+                        "details": {"type": ["string", "null"], "description": "Additional output voltage details"}
+                      },
+                      "required": ["value", "unit", "details"],
+                      "additionalProperties": false
+                    },
+                    "output_current": {
+                      "type": "object",
+                      "properties": {
+                        "value": {"type": ["number", "null"], "description": "Output current to motor"},
+                        "unit": {"type": ["string", "null"], "description": "Current unit (A)"},
+                        "details": {"type": ["string", "null"], "description": "Additional output current details"}
+                      },
+                      "required": ["value", "unit", "details"],
+                      "additionalProperties": false
+                    },
+                    "output_frequency_min": {
+                      "type": "object",
+                      "properties": {
+                        "value": {"type": ["number", "null"], "description": "Minimum output frequency to motor"},
+                        "unit": {"type": ["string", "null"], "description": "Frequency unit (Hz)"},
+                        "details": {"type": ["string", "null"], "description": "Additional details"}
+                      },
+                      "required": ["value", "unit", "details"],
+                      "additionalProperties": false
+                    },
+                    "output_frequency_max": {
+                      "type": "object",
+                      "properties": {
+                        "value": {"type": ["number", "null"], "description": "Maximum output frequency to motor"},
+                        "unit": {"type": ["string", "null"], "description": "Frequency unit (Hz)"},
+                        "details": {"type": ["string", "null"], "description": "Additional details"}
+                      },
+                      "required": ["value", "unit", "details"],
+                      "additionalProperties": false
+                    },
+                    "power_rating": {
+                      "type": "object",
+                      "properties": {
+                        "value": {"type": ["number", "null"], "description": "VFD power rating"},
+                        "unit": {"type": ["string", "null"], "description": "Power unit (HP, kW)"},
+                        "details": {"type": ["string", "null"], "description": "Additional power details"}
+                      },
+                      "required": ["value", "unit", "details"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["input_voltage", "input_current", "input_phases", "input_frequency", "output_voltage", "output_current", "output_frequency_min", "output_frequency_max", "power_rating"],
+                  "additionalProperties": false
+                },
+                "enclosure_rating": {
+                  "type": "object",
+                  "properties": {
+                    "value": {"type": ["string", "null"], "description": "NEMA Type 1, 12, 3R, 3RX, 4, 4X, etc."},
+                    "reference": {"type": ["string", "null"], "description": "Document reference"},
+                    "details": {"type": ["string", "null"], "description": "Additional enclosure details"}
+                  },
+                  "required": ["value", "reference", "details"],
+                  "additionalProperties": false
+                },
+                "harmonic_mitigation": {
+                  "type": "object",
+                  "properties": {
+                    "value": {"type": ["string", "null"], "description": "6-Pulse, Passive filter, ULH, etc."},
+                    "reference": {"type": ["string", "null"], "description": "Document reference"},
+                    "details": {"type": ["string", "null"], "description": "Additional harmonic details"}
+                  },
+                  "required": ["value", "reference", "details"],
+                  "additionalProperties": false
+                },
+                "disconnect": {
+                  "type": "object",
+                  "properties": {
+                    "value": {"type": ["string", "null"], "description": "Disconnect with fuses, Circuit breaker, None"},
+                    "reference": {"type": ["string", "null"], "description": "Document reference"},
+                    "details": {"type": ["string", "null"], "description": "Additional disconnect details"}
+                  },
+                  "required": ["value", "reference", "details"],
+                  "additionalProperties": false
+                },
+                "bypass": {
+                  "type": "object",
+                  "properties": {
+                    "value": {"type": ["string", "null"], "description": "Vertical, box, soft start bypass, redundant drive, None"},
+                    "reference": {"type": ["string", "null"], "description": "Document reference"},
+                    "details": {"type": ["string", "null"], "description": "Additional bypass details"}
+                  },
+                  "required": ["value", "reference", "details"],
+                  "additionalProperties": false
+                },
+                "features": {
+                  "type": "array",
+                  "items": {"type": "string"},
+                  "description": "List of VFD features"
+                },
+                "certifications": {
+                  "type": "array",
+                  "items": {"type": "string"},
+                  "description": "VFD certifications and standards"
+                }
+              },
+              "required": ["product_name", "manufacturer", "model_number", "quantity", "electrical", "enclosure_rating", "harmonic_mitigation", "disconnect", "bypass", "features", "certifications"],
+              "additionalProperties": false
+            },
+            "motor": {
+              "type": "object",
+              "description": "Motor specifications driven by the VFD",
+              "properties": {
+                "product_name": {
+                  "type": ["string", "null"],
+                  "description": "Official motor product name or identifier"
+                },
+                "manufacturer": {
+                  "type": ["string", "null"],
+                  "description": "Motor manufacturer name"
+                },
+                "model_number": {
+                  "type": ["string", "null"],
+                  "description": "Model or catalog number"
+                },
+                "frame_size": {
+                  "type": ["string", "null"],
+                  "description": "NEMA or IEC frame size (e.g., 143T, 182T, 254T)"
+                },
+                "motor_type": {
+                  "type": ["string", "null"],
+                  "description": "Motor type (AC Induction, Permanent Magnet, EC, etc.)"
+                },
+                "electrical": {
+                  "type": "object",
+                  "properties": {
+                    "voltage": {
+                      "type": "object",
+                      "properties": {
+                        "value": {"type": ["number", "string", "null"], "description": "Motor voltage (can be dual like 230/460)"},
+                        "unit": {"type": ["string", "null"], "description": "Voltage unit (V)"},
+                        "details": {"type": ["string", "null"], "description": "Additional voltage details"}
+                      },
+                      "required": ["value", "unit", "details"],
+                      "additionalProperties": false
+                    },
+                    "current": {
+                      "type": "object",
+                      "properties": {
+                        "value": {"type": ["number", "string", "null"], "description": "Full load amps (FLA)"},
+                        "unit": {"type": ["string", "null"], "description": "Current unit (A)"},
+                        "details": {"type": ["string", "null"], "description": "Additional current details"}
+                      },
+                      "required": ["value", "unit", "details"],
+                      "additionalProperties": false
+                    },
+                    "phases": {
+                      "type": "object",
+                      "properties": {
+                        "value": {"type": ["number", "null"], "description": "Number of phases (1 or 3)"},
+                        "details": {"type": ["string", "null"], "description": "Additional phase details"}
+                      },
+                      "required": ["value", "details"],
+                      "additionalProperties": false
+                    },
+                    "frequency": {
+                      "type": "object",
+                      "properties": {
+                        "value": {"type": ["number", "null"], "description": "Rated frequency"},
+                        "unit": {"type": ["string", "null"], "description": "Frequency unit (Hz)"},
+                        "details": {"type": ["string", "null"], "description": "Additional frequency details"}
+                      },
+                      "required": ["value", "unit", "details"],
+                      "additionalProperties": false
+                    },
+                    "power_rating": {
+                      "type": "object",
+                      "properties": {
+                        "value": {"type": ["number", "null"], "description": "Motor nameplate power rating"},
+                        "unit": {"type": ["string", "null"], "description": "Power unit (HP, kW)"},
+                        "details": {"type": ["string", "null"], "description": "Additional power details"}
+                      },
+                      "required": ["value", "unit", "details"],
+                      "additionalProperties": false
+                    },
+                    "speed": {
+                      "type": "object",
+                      "properties": {
+                        "value": {"type": ["number", "null"], "description": "Full load speed"},
+                        "unit": {"type": ["string", "null"], "description": "Speed unit (RPM)"},
+                        "details": {"type": ["string", "null"], "description": "Additional speed details"}
+                      },
+                      "required": ["value", "unit", "details"],
+                      "additionalProperties": false
+                    },
+                    "efficiency": {
+                      "type": "object",
+                      "properties": {
+                        "value": {"type": ["number", "null"], "description": "Motor efficiency"},
+                        "unit": {"type": ["string", "null"], "description": "Efficiency unit (%)"},
+                        "details": {"type": ["string", "null"], "description": "Additional efficiency details (premium, IE3, etc.)"}
+                      },
+                      "required": ["value", "unit", "details"],
+                      "additionalProperties": false
+                    },
+                    "power_factor": {
+                      "type": "object",
+                      "properties": {
+                        "value": {"type": ["number", "null"], "description": "Power factor (0.70-0.95)"},
+                        "unit": {"type": ["string", "null"], "description": "Unit (dimensionless or %)"},
+                        "details": {"type": ["string", "null"], "description": "Additional power factor details"}
+                      },
+                      "required": ["value", "unit", "details"],
+                      "additionalProperties": false
+                    },
+                    "service_factor": {
+                      "type": "object",
+                      "properties": {
+                        "value": {"type": ["number", "null"], "description": "Service factor (1.0, 1.15, 1.25)"},
+                        "details": {"type": ["string", "null"], "description": "Additional service factor details"}
+                      },
+                      "required": ["value", "details"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["voltage", "current", "phases", "frequency", "power_rating", "speed", "efficiency", "power_factor", "service_factor"],
+                  "additionalProperties": false
+                },
+                "features": {
+                  "type": "array",
+                  "items": {"type": "string"},
+                  "description": "List of motor features"
+                },
+                "certifications": {
+                  "type": "array",
+                  "items": {"type": "string"},
+                  "description": "Motor certifications and standards"
+                }
+              },
+              "required": ["product_name", "manufacturer", "model_number", "frame_size", "motor_type", "electrical", "features", "certifications"],
+              "additionalProperties": false
+            },
+            "notes": {
+              "type": ["string", "null"],
+              "description": "Additional notes about this VFD-Motor pair"
+            }
+          },
+          "required": ["tag", "location", "application", "vfd", "motor", "notes"],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": ["vfd_motor_pairs"],
+    "additionalProperties": false
+  }
+}

@@ -1,0 +1,215 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1480" height="1210" viewBox="0 0 1480 1210" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#243A5E"/>
+    </marker>
+    <marker id="arrowGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#107C10"/>
+    </marker>
+    <marker id="arrowGrey" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#8A8886"/>
+    </marker>
+    <style>
+      .t     { font-size:13px; fill:#243A5E; }
+      .ts    { font-size:11.5px; fill:#5A5A5A; }
+      .tw    { font-size:13px; fill:#ffffff; font-weight:600; }
+      .h     { font-size:15px; fill:#243A5E; font-weight:700; }
+      .band  { font-size:12px; fill:#8A8886; font-weight:700; letter-spacing:1.2px; }
+      .box   { fill:#EFF6FC; stroke:#0078D4; stroke-width:1.5; rx:8; }
+      .boxw  { fill:#ffffff; stroke:#C8C6C4; stroke-width:1.3; rx:8; }
+      .new   { fill:#E9F7EA; stroke:#107C10; stroke-width:2.5; rx:8; }
+      .grp   { fill:none; stroke:#C8C6C4; stroke-width:1.2; stroke-dasharray:5 4; rx:12; }
+      .azure { fill:#0078D4; stroke:none; rx:8; }
+      .warn  { fill:#FFF4E5; stroke:#F7A600; stroke-width:1.8; rx:8; }
+      .line  { stroke:#243A5E; stroke-width:1.8; fill:none; marker-end:url(#arrow); }
+      .lineG { stroke:#107C10; stroke-width:1.8; fill:none; marker-end:url(#arrowGreen); stroke-dasharray:6 4; }
+      .lineD { stroke:#8A8886; stroke-width:1.4; fill:none; marker-end:url(#arrowGrey); stroke-dasharray:3 3; }
+    </style>
+  </defs>
+
+  <rect width="1480" height="1210" fill="#FAFAFA"/>
+  <text x="40" y="42" class="h" font-size="23">GoSelect Copilot — Segment-Level Document Processing on Azure</text>
+  <text x="40" y="66" class="ts" font-size="13.5">Green = new or changed. Everything else is the existing architecture, unmodified.</text>
+
+  <!-- legend -->
+  <rect x="1070" y="26" width="370" height="46" class="boxw"/>
+  <rect x="1084" y="40" width="16" height="16" class="new"/>
+  <text x="1108" y="53" class="t">NEW / CHANGED</text>
+  <rect x="1240" y="40" width="16" height="16" class="box"/>
+  <text x="1264" y="53" class="t">Existing Azure</text>
+
+  <!-- ============ MAIN COLUMN ============ -->
+  <text x="40" y="106" class="band">1 · CONSUMERS</text>
+  <rect x="40" y="116" width="480" height="62" class="boxw"/>
+  <text x="60" y="142" class="t" font-weight="600">ABB Users / Internal</text>
+  <text x="60" y="162" class="ts">Upload customer specification packages via GoSelect Web UI</text>
+
+  <rect x="540" y="116" width="500" height="62" class="boxw"/>
+  <text x="560" y="142" class="t" font-weight="600">Channel Partners</text>
+  <text x="560" y="162" class="ts">Partner portal upload — same contract, different surface</text>
+
+  <text x="40" y="212" class="band">2 · GOSELECT PLATFORM (EXISTING, UNCHANGED)</text>
+  <rect x="40" y="222" width="1000" height="86" class="grp"/>
+  <rect x="58" y="240" width="230" height="50" class="box"/>
+  <text x="74" y="270" class="t">GoSelect APIs</text>
+  <rect x="304" y="240" width="230" height="50" class="box"/>
+  <text x="320" y="270" class="t">Sizing Engine</text>
+  <rect x="550" y="240" width="230" height="50" class="box"/>
+  <text x="566" y="270" class="t">Recommendation Engine</text>
+  <rect x="796" y="240" width="226" height="50" class="box"/>
+  <text x="812" y="270" class="t">Quotation Creator</text>
+
+  <text x="40" y="344" class="band">3 · ENTRY AND SECURITY (EXISTING)</text>
+  <rect x="40" y="354" width="1000" height="64" class="grp"/>
+  <rect x="58" y="368" width="184" height="36" class="box"/>
+  <text x="70" y="391" class="t" font-size="12">Front Door / WAF</text>
+  <rect x="256" y="368" width="184" height="36" class="box"/>
+  <text x="268" y="391" class="t" font-size="12">API Management</text>
+  <rect x="454" y="368" width="184" height="36" class="box"/>
+  <text x="466" y="391" class="t" font-size="12">Microsoft Entra ID</text>
+  <rect x="652" y="368" width="184" height="36" class="box"/>
+  <text x="664" y="391" class="t" font-size="12">Managed Identity</text>
+  <rect x="850" y="368" width="172" height="36" class="box"/>
+  <text x="862" y="391" class="t" font-size="12">Key Vault</text>
+
+  <text x="40" y="454" class="band">4 · ORCHESTRATION — AZURE CONTAINER APPS</text>
+  <rect x="40" y="464" width="1000" height="150" class="grp"/>
+  <rect x="58" y="480" width="440" height="56" class="box"/>
+  <text x="74" y="504" class="t" font-weight="600">Job Orchestrator API</text>
+  <text x="74" y="524" class="ts">Creates jobId + correlationId, persists job, returns reference</text>
+
+  <rect x="58" y="548" width="964" height="52" class="new"/>
+  <text x="74" y="570" class="t" font-weight="700" fill="#107C10">Segmentation_State  — NEW — SWAPPABLE PRODUCER</text>
+  <text x="74" y="589" class="ts">di-layout (Azure-native, baseline)  ·  mistral-blocks (30pp/en/Preview)  ·  content-understanding (page-level only)  ·  hybrid-cu-di  → manifest.json + coverage gate</text>
+
+  <rect x="518" y="480" width="504" height="56" class="warn"/>
+  <text x="534" y="502" class="t" font-weight="600">Coverage gate</text>
+  <text x="534" y="521" class="ts">unexplained_chars must be 0, else the job is held — content loss is never silent</text>
+
+  <text x="40" y="650" class="band">5 · ASYNCHRONOUS FAN-OUT</text>
+  <rect x="40" y="660" width="1000" height="58" class="box"/>
+  <text x="60" y="684" class="t" font-weight="600">Azure Service Bus — one message per SEGMENT (was: per FILE)</text>
+  <text x="60" y="704" class="ts">Body is a pointer: {jobId, fileId, fileOrdinal, segmentId, contentType, spans[], sectionRoot, layoutUri, figures[]} — never content</text>
+
+  <text x="40" y="754" class="band">6 · WORKERS — AZURE CONTAINER APPS JOBS (PARALLEL, IDEMPOTENT)</text>
+  <rect x="40" y="764" width="1000" height="196" class="grp"/>
+
+  <rect x="58" y="780" width="316" height="164" class="boxw"/>
+  <rect x="58" y="780" width="316" height="30" fill="#16A34A" rx="8"/>
+  <text x="74" y="801" class="tw">TEXT segment</text>
+  <text x="74" y="830" class="ts">1–40 pp narrative specification</text>
+  <text x="74" y="850" class="ts">Get markdown slice by span</text>
+  <text x="74" y="870" class="ts">LLM → APP / VFD / MOTOR</text>
+  <text x="74" y="896" class="ts" fill="#107C10">highRes: off · formula: off</text>
+  <text x="74" y="922" class="ts">Evidence: page, span, section</text>
+
+  <rect x="392" y="780" width="316" height="164" class="boxw"/>
+  <rect x="392" y="780" width="316" height="30" fill="#2563EB" rx="8"/>
+  <text x="408" y="801" class="tw">SCHEDULE segment</text>
+  <text x="408" y="830" class="ts">Tabular equipment schedule</text>
+  <text x="408" y="850" class="ts">Get structured table JSON</text>
+  <text x="408" y="870" class="ts">LLM → VFD–motor PAIRs</text>
+  <text x="408" y="896" class="ts" fill="#107C10">highRes: off · formula: off</text>
+  <text x="408" y="922" class="ts">Source of the tag lexicon</text>
+
+  <rect x="726" y="780" width="296" height="164" class="boxw"/>
+  <rect x="726" y="780" width="296" height="30" fill="#DC2626" rx="8"/>
+  <text x="742" y="801" class="tw">DRAWING segment</text>
+  <text x="742" y="830" class="ts">CAD / single-line diagram</text>
+  <text x="742" y="850" class="ts">DI figure crop → NATIVE TILING</text>
+  <text x="742" y="870" class="ts">Vision LLM → PAIRs</text>
+  <text x="742" y="896" class="ts" fill="#107C10">highRes: ON · formula: OFF</text>
+  <text x="742" y="922" class="ts" fill="#D13438">formula ON ⇒ VFD-401 → √{150-401}</text>
+
+  <text x="40" y="996" class="band">7 · MERGE AND VALIDATE</text>
+  <rect x="40" y="1006" width="490" height="72" class="new"/>
+  <text x="58" y="1030" class="t" font-weight="700" fill="#107C10">CrossSegment_Reconciliation — NEW</text>
+  <text x="58" y="1050" class="ts">Order by (fileOrdinal, spanOffset) · dedupe · tag lexicon repair</text>
+  <text x="58" y="1068" class="ts">Precedence — specs: SCHEDULE&gt;TEXT&gt;DRAWING</text>
+
+  <rect x="550" y="1006" width="490" height="72" class="box"/>
+  <text x="568" y="1030" class="t" font-weight="600">JSON_Validation_State → Save_Results</text>
+  <text x="568" y="1050" class="ts">Schema + plausibility + grounding. Ungrounded values rejected.</text>
+  <text x="568" y="1068" class="ts">Conflicts and low-confidence segments routed to human review.</text>
+
+  <!-- ============ SIDE COLUMN ============ -->
+  <text x="1070" y="106" class="band">AI AND COGNITIVE SERVICES</text>
+  <rect x="1070" y="116" width="370" height="192" class="grp"/>
+  <rect x="1086" y="132" width="338" height="76" class="box"/>
+  <text x="1102" y="154" class="t" font-weight="600">Azure AI Document Intelligence</text>
+  <text x="1102" y="172" class="ts">prebuilt-layout · v4.0 (2024-11-30 GA)</text>
+  <text x="1102" y="190" class="ts">MARKDOWN + JSON + output=figures</text>
+
+  <rect x="1086" y="220" width="338" height="74" class="box"/>
+  <text x="1102" y="242" class="t" font-weight="600">Azure AI Foundry — model gateway</text>
+  <text x="1102" y="260" class="ts">GPT-x · Claude (Opus 5 / 4.7+ for vision)</text>
+  <text x="1102" y="278" class="ts">Swappable behind one ModelClient seam</text>
+
+  <text x="1070" y="344" class="band">DATA AND STORAGE</text>
+  <rect x="1070" y="354" width="370" height="260" class="grp"/>
+  <rect x="1086" y="370" width="338" height="96" class="box"/>
+  <text x="1102" y="392" class="t" font-weight="600">Azure Blob Storage — immutable</text>
+  <text x="1102" y="410" class="ts">source.pdf</text>
+  <text x="1102" y="428" class="ts">layout.json (full AnalyzeResult)</text>
+  <text x="1102" y="446" class="ts">layout.md — canonical, never mutated</text>
+  <text x="1102" y="462" class="ts">figures/{figureId}.png</text>
+
+  <rect x="1086" y="478" width="338" height="86" class="box"/>
+  <text x="1102" y="500" class="t" font-weight="600">Azure Cosmos DB</text>
+  <text x="1102" y="518" class="ts">Job state · manifest · segment results</text>
+  <text x="1102" y="536" class="ts">id = {jobId}:{fileId}:{segmentId}  → upsert</text>
+  <text x="1102" y="554" class="ts">Change feed drives completion</text>
+
+  <rect x="1086" y="576" width="338" height="26" class="boxw"/>
+  <text x="1102" y="594" class="ts">Azure Cache for Redis (optional) — prompt/schema cache</text>
+
+  <text x="1070" y="650" class="band">OBSERVABILITY</text>
+  <rect x="1070" y="660" width="370" height="126" class="grp"/>
+  <rect x="1086" y="676" width="338" height="46" class="box"/>
+  <text x="1102" y="696" class="t" font-size="12">Application Insights · Azure Monitor</text>
+  <text x="1102" y="714" class="ts">correlationId end-to-end, per-segment metrics</text>
+  <rect x="1086" y="732" width="338" height="42" class="warn"/>
+  <text x="1102" y="750" class="t" font-size="12">Alert: unexplained_chars &gt; 0</text>
+  <text x="1102" y="766" class="ts">Segmentation is dropping content — stop the job</text>
+
+  <text x="1070" y="822" class="band">CI/CD</text>
+  <rect x="1070" y="832" width="370" height="128" class="grp"/>
+  <rect x="1086" y="848" width="338" height="30" class="box"/>
+  <text x="1102" y="868" class="t" font-size="12">GitHub / Azure DevOps Pipelines</text>
+  <rect x="1086" y="886" width="338" height="30" class="box"/>
+  <text x="1102" y="906" class="t" font-size="12">Azure Container Registry</text>
+  <rect x="1086" y="924" width="338" height="30" class="new"/>
+  <text x="1102" y="944" class="t" font-size="12" fill="#107C10">pytest + eval/score.py gate</text>
+
+  <rect x="1070" y="1006" width="370" height="72" class="warn"/>
+  <text x="1086" y="1028" class="t" font-weight="600">Decision required</text>
+  <text x="1086" y="1046" class="ts">Claude structured outputs are NOT available</text>
+  <text x="1086" y="1064" class="ts">on Hosted-on-Azure Foundry deployments (400).</text>
+
+  <!-- ============ FLOWS ============ -->
+  <path d="M 540 178 L 540 222" class="line"/>
+  <path d="M 540 308 L 540 354" class="line"/>
+  <path d="M 540 418 L 540 432 L 278 432 L 278 480" class="line"/>
+  <path d="M 278 536 L 278 548" class="line"/>
+  <path d="M 540 600 L 540 660" class="line"/>
+  <path d="M 216 718 L 216 780" class="line"/>
+  <path d="M 550 718 L 550 780" class="line"/>
+  <path d="M 874 718 L 874 780" class="line"/>
+
+  <!-- worker lanes converge on a collector bus -->
+  <path d="M 216 944 L 216 978 L 874 978 M 550 944 L 550 978 M 874 944 L 874 978" stroke="#243A5E" stroke-width="1.8" fill="none"/>
+  <path d="M 285 978 L 285 1006" class="line"/>
+  <path d="M 530 1042 L 550 1042" class="line"/>
+
+  <!-- service calls, each in its own vertical lane -->
+  <path d="M 1022 574 L 1044 574 L 1044 156 L 1086 156" class="lineG"/>
+  <path d="M 1022 862 L 1058 862 L 1058 250 L 1086 250" class="lineG"/>
+  <text x="1040" y="706" class="ts" fill="#107C10" transform="rotate(-90 1040 706)">Layout + figure crops</text>
+  <text x="1054" y="520" class="ts" fill="#107C10" transform="rotate(-90 1054 520)">model calls</text>
+
+  <!-- validated result returns to GoSelect down the left margin -->
+  <path d="M 285 1078 L 285 1102 L 22 1102 L 22 265 L 40 265" class="lineG"/>
+  <text x="330" y="1108" class="ts" fill="#107C10">Validated structured JSON + evidence → GoSelect APIs → sizing / recommendation / quotation</text>
+
+  <text x="40" y="1190" class="ts">Unchanged: Blob · Service Bus · Container Apps Jobs · Cosmos · Foundry · Entra · Key Vault · CI/CD · concurrency guardrails.  Changed: one new state, the loop variable, and per-segment DI feature flags.</text>
+</svg>

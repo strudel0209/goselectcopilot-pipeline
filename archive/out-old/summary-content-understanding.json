@@ -1,0 +1,45 @@
+{
+  "engine": "content-understanding",
+  "seconds": 82.1,
+  "segments": [
+    {
+      "id": "f1-seg-001",
+      "pages": [
+        1,
+        7
+      ],
+      "type": "TEXT",
+      "confidence": 1.0
+    },
+    {
+      "id": "f1-seg-002",
+      "pages": [
+        8,
+        9
+      ],
+      "type": "DRAWING",
+      "confidence": 1.0
+    },
+    {
+      "id": "f2-seg-001",
+      "pages": [
+        1,
+        1
+      ],
+      "type": "DRAWING",
+      "confidence": 1.0
+    }
+  ],
+  "coverage": {
+    "f1": 1.0,
+    "f2": 1.0
+  },
+  "headings": 19,
+  "section_strategy": "content-understanding-roles",
+  "vfds": 6,
+  "motors": 8,
+  "pairs": 11,
+  "conflicts": 0,
+  "review": 2,
+  "status": "REVIEW"
+}

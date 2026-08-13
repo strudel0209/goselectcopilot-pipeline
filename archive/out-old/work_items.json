@@ -1,0 +1,975 @@
+[
+  {
+    "schema_version": "1.0.0",
+    "job_id": "2bc11360-093e-4185-807b-f0e33e4bfc46",
+    "correlation_id": "2f53f43d-7dfe-40f4-99ce-a420f6f4f419",
+    "file_id": "f1",
+    "file_ordinal": 0,
+    "segment_id": "f1-seg-001",
+    "content_type": "DRAWING",
+    "first_page": 1,
+    "last_page": 6,
+    "spans": [
+      {
+        "offset": 10,
+        "length": 3
+      },
+      {
+        "offset": 83,
+        "length": 66
+      },
+      {
+        "offset": 182,
+        "length": 2
+      },
+      {
+        "offset": 186,
+        "length": 193
+      },
+      {
+        "offset": 152,
+        "length": 27
+      },
+      {
+        "offset": 537,
+        "length": 159
+      },
+      {
+        "offset": 743,
+        "length": 119
+      },
+      {
+        "offset": 865,
+        "length": 282
+      },
+      {
+        "offset": 1290,
+        "length": 4
+      },
+      {
+        "offset": 1297,
+        "length": 22
+      },
+      {
+        "offset": 1322,
+        "length": 5
+      },
+      {
+        "offset": 1329,
+        "length": 331
+      },
+      {
+        "offset": 1750,
+        "length": 18
+      },
+      {
+        "offset": 1771,
+        "length": 18
+      },
+      {
+        "offset": 1932,
+        "length": 4
+      },
+      {
+        "offset": 1939,
+        "length": 22
+      },
+      {
+        "offset": 2099,
+        "length": 15
+      },
+      {
+        "offset": 2116,
+        "length": 17
+      },
+      {
+        "offset": 2135,
+        "length": 22
+      },
+      {
+        "offset": 2159,
+        "length": 15
+      },
+      {
+        "offset": 2176,
+        "length": 12
+      },
+      {
+        "offset": 2190,
+        "length": 19
+      },
+      {
+        "offset": 2211,
+        "length": 30
+      },
+      {
+        "offset": 2243,
+        "length": 29
+      },
+      {
+        "offset": 2274,
+        "length": 23
+      },
+      {
+        "offset": 2299,
+        "length": 33
+      },
+      {
+        "offset": 2334,
+        "length": 12
+      },
+      {
+        "offset": 2348,
+        "length": 12
+      },
+      {
+        "offset": 2362,
+        "length": 14
+      },
+      {
+        "offset": 1985,
+        "length": 99
+      },
+      {
+        "offset": 2390,
+        "length": 21
+      },
+      {
+        "offset": 2413,
+        "length": 249
+      },
+      {
+        "offset": 2665,
+        "length": 23
+      },
+      {
+        "offset": 2690,
+        "length": 61
+      },
+      {
+        "offset": 2754,
+        "length": 22
+      },
+      {
+        "offset": 2778,
+        "length": 59
+      },
+      {
+        "offset": 2839,
+        "length": 46
+      },
+      {
+        "offset": 2887,
+        "length": 52
+      },
+      {
+        "offset": 2942,
+        "length": 18
+      }
+    ],
+    "section_root": null,
+    "layout_uri": "jobs/2bc11360-093e-4185-807b-f0e33e4bfc46/files/f1/layout.json",
+    "figures": [
+      "1.1",
+      "1.2",
+      "5.1",
+      "5.2",
+      "6.1",
+      "6.2"
+    ],
+    "high_resolution": true,
+    "formulas": false
+  },
+  {
+    "schema_version": "1.0.0",
+    "job_id": "2bc11360-093e-4185-807b-f0e33e4bfc46",
+    "correlation_id": "2f53f43d-7dfe-40f4-99ce-a420f6f4f419",
+    "file_id": "f1",
+    "file_ordinal": 0,
+    "segment_id": "f1-seg-002",
+    "content_type": "SCHEDULE",
+    "first_page": 7,
+    "last_page": 7,
+    "spans": [
+      {
+        "offset": 3051,
+        "length": 247
+      },
+      {
+        "offset": 3301,
+        "length": 24
+      },
+      {
+        "offset": 3327,
+        "length": 24
+      },
+      {
+        "offset": 3354,
+        "length": 13
+      },
+      {
+        "offset": 3369,
+        "length": 53
+      },
+      {
+        "offset": 3425,
+        "length": 27
+      },
+      {
+        "offset": 3454,
+        "length": 32
+      },
+      {
+        "offset": 3488,
+        "length": 32
+      },
+      {
+        "offset": 3522,
+        "length": 82
+      },
+      {
+        "offset": 3607,
+        "length": 14
+      },
+      {
+        "offset": 3623,
+        "length": 21
+      },
+      {
+        "offset": 3646,
+        "length": 202
+      },
+      {
+        "offset": 3851,
+        "length": 20
+      },
+      {
+        "offset": 3873,
+        "length": 149
+      },
+      {
+        "offset": 4025,
+        "length": 12
+      },
+      {
+        "offset": 4039,
+        "length": 32
+      },
+      {
+        "offset": 4073,
+        "length": 28
+      },
+      {
+        "offset": 4103,
+        "length": 17
+      },
+      {
+        "offset": 4122,
+        "length": 47
+      },
+      {
+        "offset": 4171,
+        "length": 49
+      },
+      {
+        "offset": 4222,
+        "length": 40
+      },
+      {
+        "offset": 4264,
+        "length": 40
+      },
+      {
+        "offset": 4307,
+        "length": 22
+      },
+      {
+        "offset": 4332,
+        "length": 1239
+      }
+    ],
+    "section_root": "Excitation systems",
+    "layout_uri": "jobs/2bc11360-093e-4185-807b-f0e33e4bfc46/files/f1/layout.json",
+    "figures": [],
+    "high_resolution": false,
+    "formulas": false
+  },
+  {
+    "schema_version": "1.0.0",
+    "job_id": "2bc11360-093e-4185-807b-f0e33e4bfc46",
+    "correlation_id": "2f53f43d-7dfe-40f4-99ce-a420f6f4f419",
+    "file_id": "f1",
+    "file_ordinal": 0,
+    "segment_id": "f1-seg-003",
+    "content_type": "DRAWING",
+    "first_page": 8,
+    "last_page": 9,
+    "spans": [
+      {
+        "offset": 5713,
+        "length": 1
+      },
+      {
+        "offset": 5717,
+        "length": 22
+      },
+      {
+        "offset": 5742,
+        "length": 25
+      },
+      {
+        "offset": 5769,
+        "length": 9
+      },
+      {
+        "offset": 5780,
+        "length": 43
+      },
+      {
+        "offset": 5826,
+        "length": 13
+      },
+      {
+        "offset": 5841,
+        "length": 81
+      },
+      {
+        "offset": 5925,
+        "length": 7
+      },
+      {
+        "offset": 5935,
+        "length": 35
+      },
+      {
+        "offset": 5973,
+        "length": 293
+      },
+      {
+        "offset": 6269,
+        "length": 18
+      },
+      {
+        "offset": 6378,
+        "length": 38
+      },
+      {
+        "offset": 6419,
+        "length": 26
+      },
+      {
+        "offset": 6447,
+        "length": 128
+      },
+      {
+        "offset": 6578,
+        "length": 14
+      },
+      {
+        "offset": 6594,
+        "length": 120
+      },
+      {
+        "offset": 6717,
+        "length": 14
+      },
+      {
+        "offset": 6733,
+        "length": 69
+      },
+      {
+        "offset": 6805,
+        "length": 13
+      },
+      {
+        "offset": 6820,
+        "length": 69
+      },
+      {
+        "offset": 6891,
+        "length": 93
+      },
+      {
+        "offset": 6986,
+        "length": 122
+      },
+      {
+        "offset": 7111,
+        "length": 14
+      },
+      {
+        "offset": 7127,
+        "length": 112
+      },
+      {
+        "offset": 7242,
+        "length": 17
+      },
+      {
+        "offset": 7261,
+        "length": 180
+      },
+      {
+        "offset": 7444,
+        "length": 27
+      },
+      {
+        "offset": 7473,
+        "length": 26
+      },
+      {
+        "offset": 7501,
+        "length": 19
+      },
+      {
+        "offset": 7522,
+        "length": 27
+      },
+      {
+        "offset": 7551,
+        "length": 44
+      },
+      {
+        "offset": 7597,
+        "length": 27
+      },
+      {
+        "offset": 7626,
+        "length": 5
+      },
+      {
+        "offset": 7633,
+        "length": 5
+      },
+      {
+        "offset": 7640,
+        "length": 38
+      },
+      {
+        "offset": 7680,
+        "length": 13
+      },
+      {
+        "offset": 7695,
+        "length": 16
+      },
+      {
+        "offset": 7713,
+        "length": 39
+      }
+    ],
+    "section_root": "Derating factors",
+    "layout_uri": "jobs/2bc11360-093e-4185-807b-f0e33e4bfc46/files/f1/layout.json",
+    "figures": [
+      "8.1",
+      "9.1"
+    ],
+    "high_resolution": true,
+    "formulas": false
+  },
+  {
+    "schema_version": "1.0.0",
+    "job_id": "2bc11360-093e-4185-807b-f0e33e4bfc46",
+    "correlation_id": "2f53f43d-7dfe-40f4-99ce-a420f6f4f419",
+    "file_id": "f1",
+    "file_ordinal": 0,
+    "segment_id": "f1-seg-004",
+    "content_type": "SCHEDULE",
+    "first_page": 10,
+    "last_page": 12,
+    "spans": [
+      {
+        "offset": 7895,
+        "length": 19
+      },
+      {
+        "offset": 10064,
+        "length": 2
+      },
+      {
+        "offset": 10068,
+        "length": 56
+      },
+      {
+        "offset": 7917,
+        "length": 2144
+      },
+      {
+        "offset": 10127,
+        "length": 3322
+      },
+      {
+        "offset": 13536,
+        "length": 4
+      },
+      {
+        "offset": 13543,
+        "length": 17
+      },
+      {
+        "offset": 13563,
+        "length": 5
+      },
+      {
+        "offset": 15437,
+        "length": 5
+      },
+      {
+        "offset": 13571,
+        "length": 1863
+      },
+      {
+        "offset": 15445,
+        "length": 3070
+      },
+      {
+        "offset": 18659,
+        "length": 4
+      },
+      {
+        "offset": 18666,
+        "length": 17
+      },
+      {
+        "offset": 18685,
+        "length": 1
+      },
+      {
+        "offset": 20553,
+        "length": 1
+      },
+      {
+        "offset": 18689,
+        "length": 1861
+      },
+      {
+        "offset": 20557,
+        "length": 3066
+      }
+    ],
+    "section_root": "Technical data",
+    "layout_uri": "jobs/2bc11360-093e-4185-807b-f0e33e4bfc46/files/f1/layout.json",
+    "figures": [],
+    "high_resolution": false,
+    "formulas": false
+  },
+  {
+    "schema_version": "1.0.0",
+    "job_id": "2bc11360-093e-4185-807b-f0e33e4bfc46",
+    "correlation_id": "2f53f43d-7dfe-40f4-99ce-a420f6f4f419",
+    "file_id": "f1",
+    "file_ordinal": 0,
+    "segment_id": "f1-seg-005",
+    "content_type": "DRAWING",
+    "first_page": 13,
+    "last_page": 14,
+    "spans": [
+      {
+        "offset": 23673,
+        "length": 4
+      },
+      {
+        "offset": 23680,
+        "length": 28
+      },
+      {
+        "offset": 23995,
+        "length": 3
+      },
+      {
+        "offset": 24001,
+        "length": 6
+      },
+      {
+        "offset": 24010,
+        "length": 18
+      },
+      {
+        "offset": 24906,
+        "length": 26
+      },
+      {
+        "offset": 25260,
+        "length": 30
+      },
+      {
+        "offset": 25573,
+        "length": 29
+      },
+      {
+        "offset": 26648,
+        "length": 5
+      },
+      {
+        "offset": 26656,
+        "length": 17
+      },
+      {
+        "offset": 27455,
+        "length": 26
+      },
+      {
+        "offset": 27809,
+        "length": 29
+      },
+      {
+        "offset": 23711,
+        "length": 281
+      },
+      {
+        "offset": 24031,
+        "length": 872
+      },
+      {
+        "offset": 24935,
+        "length": 322
+      },
+      {
+        "offset": 25293,
+        "length": 277
+      },
+      {
+        "offset": 25605,
+        "length": 719
+      },
+      {
+        "offset": 26327,
+        "length": 318
+      },
+      {
+        "offset": 26676,
+        "length": 776
+      },
+      {
+        "offset": 27484,
+        "length": 322
+      },
+      {
+        "offset": 27841,
+        "length": 716
+      },
+      {
+        "offset": 28701,
+        "length": 4
+      },
+      {
+        "offset": 28708,
+        "length": 28
+      },
+      {
+        "offset": 28739,
+        "length": 559
+      }
+    ],
+    "section_root": "Technical data",
+    "layout_uri": "jobs/2bc11360-093e-4185-807b-f0e33e4bfc46/files/f1/layout.json",
+    "figures": [
+      "13.1",
+      "13.2",
+      "14.1"
+    ],
+    "high_resolution": true,
+    "formulas": false
+  },
+  {
+    "schema_version": "1.0.0",
+    "job_id": "2bc11360-093e-4185-807b-f0e33e4bfc46",
+    "correlation_id": "2f53f43d-7dfe-40f4-99ce-a420f6f4f419",
+    "file_id": "f1",
+    "file_ordinal": 0,
+    "segment_id": "f1-seg-006",
+    "content_type": "SCHEDULE",
+    "first_page": 15,
+    "last_page": 15,
+    "spans": [
+      {
+        "offset": 29386,
+        "length": 6
+      },
+      {
+        "offset": 29395,
+        "length": 18
+      },
+      {
+        "offset": 30373,
+        "length": 29
+      },
+      {
+        "offset": 30685,
+        "length": 29
+      },
+      {
+        "offset": 31259,
+        "length": 6
+      },
+      {
+        "offset": 31268,
+        "length": 18
+      },
+      {
+        "offset": 32178,
+        "length": 29
+      },
+      {
+        "offset": 29416,
+        "length": 573
+      },
+      {
+        "offset": 29992,
+        "length": 378
+      },
+      {
+        "offset": 30405,
+        "length": 277
+      },
+      {
+        "offset": 30717,
+        "length": 539
+      },
+      {
+        "offset": 31289,
+        "length": 505
+      },
+      {
+        "offset": 31797,
+        "length": 378
+      },
+      {
+        "offset": 32210,
+        "length": 539
+      }
+    ],
+    "section_root": "Outline drawing NMG 0450",
+    "layout_uri": "jobs/2bc11360-093e-4185-807b-f0e33e4bfc46/files/f1/layout.json",
+    "figures": [],
+    "high_resolution": false,
+    "formulas": false
+  },
+  {
+    "schema_version": "1.0.0",
+    "job_id": "2bc11360-093e-4185-807b-f0e33e4bfc46",
+    "correlation_id": "2f53f43d-7dfe-40f4-99ce-a420f6f4f419",
+    "file_id": "f1",
+    "file_ordinal": 0,
+    "segment_id": "f1-seg-007",
+    "content_type": "DRAWING",
+    "first_page": 16,
+    "last_page": 20,
+    "spans": [
+      {
+        "offset": 32893,
+        "length": 4
+      },
+      {
+        "offset": 32900,
+        "length": 31
+      },
+      {
+        "offset": 33354,
+        "length": 5
+      },
+      {
+        "offset": 33362,
+        "length": 19
+      },
+      {
+        "offset": 33750,
+        "length": 31
+      },
+      {
+        "offset": 32934,
+        "length": 417
+      },
+      {
+        "offset": 33384,
+        "length": 363
+      },
+      {
+        "offset": 33784,
+        "length": 356
+      },
+      {
+        "offset": 34228,
+        "length": 4
+      },
+      {
+        "offset": 34235,
+        "length": 31
+      },
+      {
+        "offset": 34565,
+        "length": 5
+      },
+      {
+        "offset": 34573,
+        "length": 18
+      },
+      {
+        "offset": 34269,
+        "length": 293
+      },
+      {
+        "offset": 34594,
+        "length": 351
+      },
+      {
+        "offset": 34948,
+        "length": 414
+      },
+      {
+        "offset": 35506,
+        "length": 4
+      },
+      {
+        "offset": 35513,
+        "length": 77
+      },
+      {
+        "offset": 35614,
+        "length": 14
+      },
+      {
+        "offset": 35630,
+        "length": 20
+      },
+      {
+        "offset": 35652,
+        "length": 47
+      },
+      {
+        "offset": 35701,
+        "length": 15
+      },
+      {
+        "offset": 35718,
+        "length": 34
+      },
+      {
+        "offset": 35754,
+        "length": 30
+      },
+      {
+        "offset": 35786,
+        "length": 34
+      },
+      {
+        "offset": 35822,
+        "length": 25
+      },
+      {
+        "offset": 35849,
+        "length": 31
+      },
+      {
+        "offset": 35882,
+        "length": 17
+      },
+      {
+        "offset": 35902,
+        "length": 15
+      },
+      {
+        "offset": 35919,
+        "length": 20
+      },
+      {
+        "offset": 35941,
+        "length": 47
+      },
+      {
+        "offset": 35990,
+        "length": 15
+      },
+      {
+        "offset": 36007,
+        "length": 34
+      },
+      {
+        "offset": 36043,
+        "length": 34
+      },
+      {
+        "offset": 36079,
+        "length": 25
+      },
+      {
+        "offset": 36106,
+        "length": 13
+      },
+      {
+        "offset": 36121,
+        "length": 17
+      },
+      {
+        "offset": 36141,
+        "length": 14
+      },
+      {
+        "offset": 36157,
+        "length": 30
+      },
+      {
+        "offset": 36189,
+        "length": 51
+      },
+      {
+        "offset": 36242,
+        "length": 51
+      },
+      {
+        "offset": 36295,
+        "length": 36
+      },
+      {
+        "offset": 36333,
+        "length": 40
+      },
+      {
+        "offset": 36375,
+        "length": 38
+      },
+      {
+        "offset": 36416,
+        "length": 26
+      },
+      {
+        "offset": 36445,
+        "length": 24
+      },
+      {
+        "offset": 35593,
+        "length": 18
+      },
+      {
+        "offset": 36491,
+        "length": 22
+      },
+      {
+        "offset": 36515,
+        "length": 301
+      },
+      {
+        "offset": 36818,
+        "length": 258
+      },
+      {
+        "offset": 37099,
+        "length": 5
+      },
+      {
+        "offset": 37106,
+        "length": 74
+      }
+    ],
+    "section_root": "Transportation parameters",
+    "layout_uri": "jobs/2bc11360-093e-4185-807b-f0e33e4bfc46/files/f1/layout.json",
+    "figures": [
+      "16.1",
+      "17.1",
+      "18.1",
+      "20.1"
+    ],
+    "high_resolution": true,
+    "formulas": false
+  }
+]

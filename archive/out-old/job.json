@@ -1,0 +1,30 @@
+{
+  "schema_version": "1.0.0",
+  "job_id": "94384410-3c10-433a-85a4-d018793cbe0a",
+  "correlation_id": "788c1af6-b4d5-4e12-b4c9-ff1142fb787c",
+  "status": "DONE",
+  "segments_expected": 7,
+  "segments_done": 7,
+  "segments_failed": 0,
+  "payload": {
+    "motors": [],
+    "vfds": [],
+    "applications": [],
+    "pairs": [],
+    "notes": []
+  },
+  "conflicts": [],
+  "review_required": [
+    "f1-seg-001"
+  ],
+  "coverage": {
+    "f1": {
+      "total_chars": 37351,
+      "covered_chars": 34600,
+      "furniture_chars": 2751,
+      "unexplained_chars": 0,
+      "unexplained_samples": []
+    }
+  },
+  "completed_at": "2026-08-07T13:24:20.497356Z"
+}

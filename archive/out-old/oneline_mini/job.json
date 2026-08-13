@@ -1,0 +1,30 @@
+{
+  "schema_version": "1.0.0",
+  "job_id": "3c221ec7-73ee-4b96-8241-2ee71e280824",
+  "correlation_id": "7cc3e57e-94ba-42ca-a5f6-f8c5ecb3ca9a",
+  "status": "DONE",
+  "segments_expected": 1,
+  "segments_done": 1,
+  "segments_failed": 0,
+  "payload": {
+    "motors": [],
+    "vfds": [],
+    "applications": [],
+    "pairs": [],
+    "notes": [
+      "No clearly readable motor-to-drive connection lines were visible for a confident pairing extraction."
+    ]
+  },
+  "conflicts": [],
+  "review_required": [],
+  "coverage": {
+    "f1": {
+      "total_chars": 4853,
+      "covered_chars": 4843,
+      "furniture_chars": 10,
+      "unexplained_chars": 0,
+      "unexplained_samples": []
+    }
+  },
+  "completed_at": "2026-08-13T11:03:52.144478Z"
+}

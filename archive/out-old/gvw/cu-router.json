@@ -1,0 +1,25 @@
+{
+  "baseAnalyzerId": "prebuilt-document",
+  "description": "GoSelect Copilot router: classify and split a specification package",
+  "config": {
+    "returnDetails": true,
+    "enableSegment": true,
+    "contentCategories": {
+      "TextSpecification": {
+        "description": "Narrative technical specification prose: numbered sections and sub-sections, requirement clauses, scope of supply, standards references. Predominantly paragraphs, few or no tables, no drawing border or title block."
+      },
+      "EquipmentSchedule": {
+        "description": "Tabular equipment, motor, VFD or panel schedule. Page is dominated by one or more grids with column headers such as Tag, HP, kW, Voltage, FLA, Enclosure, Service."
+      },
+      "Drawing": {
+        "description": "Engineering drawing sheet: single-line diagram, P&ID, layout or elevation. Has a drawing border with a zone grid, a title block in the lower right, symbols connected by lines, and sparse rotated text."
+      },
+      "Other": {
+        "description": "Cover pages, transmittals, blank pages, revision histories."
+      }
+    }
+  },
+  "models": {
+    "completion": "gpt-4.1"
+  }
+}

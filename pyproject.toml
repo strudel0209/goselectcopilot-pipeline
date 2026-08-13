@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "goselect-docproc"
+version = "0.1.0"
+description = "Segment-level document processing for the ABB GoSelect Copilot pipeline"
+requires-python = ">=3.11"
+dependencies = [
+    "azure-ai-documentintelligence>=1.0.2",
+    "azure-identity>=1.19.0",
+    "pydantic>=2.7",
+    "pillow>=10.3.0",
+    "rapidfuzz>=3.9.0",
+    "python-dotenv>=1.0.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.2", "pytest-cov>=5.0"]
+viz = ["pymupdf>=1.24.0", "matplotlib>=3.8.0", "pandas>=2.2.0"]
+
+[project.scripts]
+goselect-docproc = "goselect_docproc.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

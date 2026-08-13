@@ -1,0 +1,170 @@
+[
+  {
+    "model": "gpt-5.4-mini",
+    "values": 9,
+    "clauses": 9,
+    "seconds": 3.3,
+    "usage": {
+      "completion_tokens": 570,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 0,
+        "rejected_prediction_tokens": 0
+      },
+      "latency_checkpoint": {
+        "engine_tbt_ms": 3,
+        "engine_ttft_ms": 128,
+        "engine_ttlt_ms": 2087,
+        "pre_inference_ms": 136,
+        "service_tbt_ms": 3,
+        "service_ttft_ms": 697,
+        "service_ttlt_ms": 2649,
+        "total_duration_ms": 2524,
+        "user_visible_ttft_ms": 561
+      },
+      "prompt_tokens": 3792,
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cached_tokens": 0
+      },
+      "total_tokens": 4362
+    },
+    "extracted": {
+      "manufacturer": "ABB",
+      "product_name": "ACQ580",
+      "input_voltage_v": 460,
+      "input_phases": 3,
+      "input_frequency_hz": 60,
+      "output_frequency_min_hz": 4,
+      "output_frequency_max_hz": 60,
+      "short_circuit_rating_aic": 65000,
+      "ambient_temp_max_c": 40,
+      "altitude_max_ft": 3300
+    },
+    "citations": {
+      "manufacturer": "1.03.E",
+      "product_name": "1.03.E",
+      "input_voltage_v": "2.02.A",
+      "input_phases": "2.02.A",
+      "input_frequency_hz": "2.02.C",
+      "output_frequency_min_hz": "2.02.F.4",
+      "output_frequency_max_hz": "2.02.F.4",
+      "short_circuit_rating_aic": "2.02.G.1",
+      "ambient_temp_max_c": "2.02.D",
+      "altitude_max_ft": "2.02.D"
+    }
+  },
+  {
+    "model": "gpt-5.4",
+    "values": 9,
+    "clauses": 9,
+    "seconds": 5.46,
+    "usage": {
+      "completion_tokens": 635,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 0,
+        "rejected_prediction_tokens": 0
+      },
+      "latency_checkpoint": {
+        "engine_tbt_ms": 7,
+        "engine_ttft_ms": 183,
+        "engine_ttlt_ms": 4550,
+        "pre_inference_ms": 93,
+        "service_tbt_ms": 7,
+        "service_ttft_ms": 522,
+        "service_ttlt_ms": 4882,
+        "total_duration_ms": 4797,
+        "user_visible_ttft_ms": 429
+      },
+      "prompt_tokens": 3792,
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cached_tokens": 0
+      },
+      "total_tokens": 4427
+    },
+    "extracted": {
+      "manufacturer": "ABB",
+      "product_name": "ACQ580",
+      "input_voltage_v": 460,
+      "input_phases": 3,
+      "input_frequency_hz": 60,
+      "output_frequency_min_hz": 4,
+      "output_frequency_max_hz": 60,
+      "short_circuit_rating_aic": 65000,
+      "ambient_temp_max_c": 40,
+      "altitude_max_ft": 3300
+    },
+    "citations": {
+      "manufacturer": "1.03",
+      "product_name": "1.03",
+      "input_voltage_v": "2.02",
+      "input_phases": "2.02",
+      "input_frequency_hz": "2.02",
+      "output_frequency_min_hz": "2.02",
+      "output_frequency_max_hz": "2.02",
+      "short_circuit_rating_aic": "2.02",
+      "ambient_temp_max_c": "2.02",
+      "altitude_max_ft": "2.02"
+    }
+  },
+  {
+    "model": "gpt-5.6-sol",
+    "values": 10,
+    "clauses": 10,
+    "seconds": 6.98,
+    "usage": {
+      "completion_tokens": 746,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 204,
+        "rejected_prediction_tokens": 0
+      },
+      "latency_checkpoint": {
+        "engine_tbt_ms": 8,
+        "engine_ttft_ms": 192,
+        "engine_ttlt_ms": 5976,
+        "pre_inference_ms": 102,
+        "service_tbt_ms": 8,
+        "service_ttft_ms": 422,
+        "service_ttlt_ms": 6200,
+        "total_duration_ms": 6107,
+        "user_visible_ttft_ms": 320
+      },
+      "prompt_tokens": 3792,
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cached_tokens": 0
+      },
+      "total_tokens": 4538
+    },
+    "extracted": {
+      "manufacturer": "ABB",
+      "product_name": "ACQ580",
+      "input_voltage_v": 460,
+      "input_phases": 3,
+      "input_frequency_hz": 60,
+      "output_frequency_min_hz": 1,
+      "output_frequency_max_hz": 60,
+      "short_circuit_rating_aic": 65000,
+      "ambient_temp_max_c": 40,
+      "altitude_max_ft": 3300
+    },
+    "citations": {
+      "manufacturer": "1.03.E",
+      "product_name": "1.03.E",
+      "input_voltage_v": "2.02.C",
+      "input_phases": "2.02.C",
+      "input_frequency_hz": "2.02.C",
+      "output_frequency_min_hz": "2.02.H.1",
+      "output_frequency_max_hz": "2.02.H.2",
+      "short_circuit_rating_aic": "2.02.G.1",
+      "ambient_temp_max_c": "2.02.D",
+      "altitude_max_ft": "2.02.D"
+    }
+  }
+]

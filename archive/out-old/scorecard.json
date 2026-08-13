@@ -1,0 +1,41 @@
+{
+  "generated_at": "2026-08-13T09:51:57.300606+00:00",
+  "documents": [
+    "98878_1_HoweyVFDs",
+    "98878_2_HoweyOneline"
+  ],
+  "gates": {
+    "page_classification_f1": 0.85,
+    "segment_boundary_iou": 0.9,
+    "section_heading_f1": 0.9,
+    "section_attribution_digital": 0.95,
+    "section_attribution_scanned": 0.8,
+    "coverage_pass_rate": 1.0,
+    "pair_f1": 0.9
+  },
+  "measured": {
+    "page_classification_f1": 1.0,
+    "segment_boundary_iou": 1.0,
+    "section_heading_f1": 0.9473684210526316,
+    "section_attribution_digital": null,
+    "section_attribution_scanned": 1.0,
+    "coverage_pass_rate": 1.0,
+    "pair_f1": null
+  },
+  "passed": false,
+  "per_class": {
+    "DRAWING": {
+      "tp": 3,
+      "fp": 0,
+      "fn": 0,
+      "f1": 1.0
+    },
+    "TEXT": {
+      "tp": 7,
+      "fp": 0,
+      "fn": 0,
+      "f1": 1.0
+    }
+  },
+  "report": "documents scored: 2\n\nper-class page classification\n  DRAWING   P=1.000 R=1.000 F1=1.000  (tp=3 fp=0 fn=0)\n  TEXT      P=1.000 R=1.000 F1=1.000  (tp=7 fp=0 fn=0)\n\nheading detection P=0.900 R=1.000 F1=0.947  (tp=18 fp=2 fn=0)\ntag extraction   P=0.000 R=0.000 F1=0.000\npair extraction  P=0.000 R=0.000 F1=0.000\n\ngates\n  page_classification_f1           1.000 >= 0.85  [PASS]\n  segment_boundary_iou             1.000 >= 0.90  [PASS]\n  section_heading_f1               0.947 >= 0.90  [PASS]\n  section_attribution_digital        n/a  >= 0.95  [NOT MEASURED]\n  section_attribution_scanned      1.000 >= 0.80  [PASS]\n  coverage_pass_rate               1.000 >= 1.00  [PASS]\n  pair_f1                            n/a  >= 0.90  [NOT MEASURED]\n\n  NOT MEASURED is not a pass. These gates have no labelled sample yet and block release just as a failure does:\n    - section_attribution_digital\n    - pair_f1"
+}

@@ -1,0 +1,43 @@
+{
+  "document": "98878_2_HoweyOneline.pdf",
+  "scan_quality": "digital",
+  "_provenance": "Hand-labelled from the source PDF. Single E-size electrical one-line diagram, Howey-in-the-Hills FL WTP No. 3, same opportunity as 98878_1. Tags below were confirmed present in the Document Intelligence Layout content string.",
+
+  "pages": { "1": "DRAWING" },
+
+  "sections": {},
+  "headings": [],
+  "_section_note": "A one-line diagram has no document structure. The section index must emit zero nodes for this file; any node is a false positive.",
+
+  "tags": [
+    "VFD-H1", "VFD-H2", "VFD-H3", "VFD-J4",
+    "SSS-W5", "SSS-W6"
+  ],
+
+  "pairs": [
+    ["VFD-H1", "HIGH SERVICE PUMP 1"],
+    ["VFD-H2", "HIGH SERVICE PUMP 2"],
+    ["VFD-H3", "HIGH SERVICE PUMP 3"],
+    ["VFD-J4", "JOCKEY PUMP"]
+  ],
+
+  "_pairing_note": "Four VFD-driven pairs only. SSS-W5 and SSS-W6 drive WELL NO.5 and WELL NO.6 through SOLID STATE STARTERS, not VFDs; emitting them as vfd_motor_pairs is a false positive and the main precision trap in this package. Motor tags are descriptive load names, not tag numbers - the drawing carries no motor tag scheme, which is itself a finding.",
+
+  "_ampacity_hypothesis": "Sheet E-07 (98878_1 p9) carries a handwritten '3\u00d7 124 Amp 1\u00d7 65 Amp', consistent with VFD-H1/H2/H3 at 124 A and VFD-J4 at 65 A. Sheet E-08 carries '2\u00d7 124 Amp' for the two well-pump starters. Confirm with the customer before treating as ground truth.",
+
+  "_ocr_artefacts": [
+    {
+      "observed": "GNO-3",
+      "correct": "GND-3",
+      "class": "D\u2192O homoglyph",
+      "_note": "Live example of the corruption TagLexicon.snap exists to repair, found on real customer data rather than constructed."
+    }
+  ],
+
+  "_other_tags_present": [
+    "SWBD-1", "SWBD-2", "ATS-2", "MTS-1", "MTS-2",
+    "GND-1", "GND-2", "GND-3", "CND-2", "CND-3",
+    "L1-1", "T-L1", "T-L2", "M15-2", "E-03", "E-05"
+  ],
+  "_other_tags_note": "Distribution equipment, not drives. Present so tag precision is scored against what is actually on the sheet rather than against an idealised list."
+}

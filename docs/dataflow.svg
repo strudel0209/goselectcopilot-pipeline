@@ -1,0 +1,166 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1480" height="1180" viewBox="0 0 1480 1180" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#243A5E"/>
+    </marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#107C10"/>
+    </marker>
+    <style>
+      .t    { font-size:13px; fill:#243A5E; }
+      .ts   { font-size:11.5px; fill:#5A5A5A; }
+      .tm   { font-size:11px; fill:#243A5E; font-family:Consolas, monospace; }
+      .h    { font-size:15px; fill:#243A5E; font-weight:700; }
+      .band { font-size:12px; fill:#8A8886; font-weight:700; letter-spacing:1.2px; }
+      .box  { fill:#EFF6FC; stroke:#0078D4; stroke-width:1.5; rx:8; }
+      .boxw { fill:#ffffff; stroke:#C8C6C4; stroke-width:1.3; rx:8; }
+      .new  { fill:#E9F7EA; stroke:#107C10; stroke-width:2.2; rx:8; }
+      .warn { fill:#FFF4E5; stroke:#F7A600; stroke-width:1.8; rx:8; }
+      .grp  { fill:none; stroke:#C8C6C4; stroke-width:1.2; stroke-dasharray:5 4; rx:12; }
+      .ln   { stroke:#243A5E; stroke-width:1.8; fill:none; marker-end:url(#a); }
+      .lng  { stroke:#107C10; stroke-width:1.8; fill:none; marker-end:url(#ag); }
+      .tick { stroke:#B3B0AD; stroke-width:1; }
+    </style>
+  </defs>
+  <rect width="1480" height="1180" fill="#FAFAFA"/>
+
+  <text x="40" y="42" class="h" font-size="23">Data Flow — spans are the only thing that moves</text>
+  <text x="40" y="66" class="ts" font-size="13.5">One immutable content string per file. Segments are ranges over it, never copies. Reassembly is therefore a sort, not a merge.</text>
+
+  <!-- 1. INPUT -->
+  <text x="40" y="106" class="band">STEP 1 · ONE LAYOUT CALL PER FILE (CACHED BY SHA-256 — THE SAME BYTES ARE NEVER BILLED TWICE)</text>
+  <rect x="40" y="118" width="250" height="58" class="boxw"/>
+  <text x="58" y="142" class="t" font-weight="600">Customer package PDF</text>
+  <text x="58" y="162" class="ts">spec prose + schedules + CAD</text>
+
+  <rect x="330" y="118" width="300" height="58" class="box"/>
+  <text x="348" y="142" class="t" font-weight="600">prebuilt-layout v4.0</text>
+  <text x="348" y="162" class="ts">MARKDOWN + JSON + output=figures</text>
+  <path d="M 290 147 L 330 147" class="ln"/>
+
+  <rect x="670" y="118" width="770" height="58" class="boxw"/>
+  <text x="688" y="142" class="t" font-weight="600">AnalyzeResult — content, pages, paragraphs, tables, figures, styles</text>
+  <text x="688" y="162" class="ts">Text and geometry arrive in the SAME response. Keeping both is what makes everything downstream free.</text>
+  <path d="M 630 147 L 670 147" class="ln"/>
+
+  <!-- 2. CONTENT STRING -->
+  <text x="40" y="214" class="band">STEP 2 · result.content — ONE STRING, 37,351 CHARACTERS (MEASURED ON THE ABB SAMPLE)</text>
+  <rect x="40" y="226" width="1400" height="76" class="grp"/>
+  <rect x="60" y="244" width="1360" height="30" fill="#E5E5E5" stroke="#B3B0AD" rx="4"/>
+  <rect x="60" y="244" width="180" height="30" fill="#16A34A" opacity="0.75" rx="4"/>
+  <rect x="250" y="244" width="300" height="30" fill="#2563EB" opacity="0.75"/>
+  <rect x="560" y="244" width="110" height="30" fill="#DC2626" opacity="0.75"/>
+  <rect x="680" y="244" width="240" height="30" fill="#2563EB" opacity="0.75"/>
+  <rect x="930" y="244" width="150" height="30" fill="#16A34A" opacity="0.75"/>
+  <rect x="1090" y="244" width="200" height="30" fill="#DC2626" opacity="0.75"/>
+  <rect x="1300" y="244" width="120" height="30" fill="#2563EB" opacity="0.75" rx="4"/>
+  <line x1="60" y1="280" x2="60" y2="288" class="tick"/>
+  <line x1="740" y1="280" x2="740" y2="288" class="tick"/>
+  <line x1="1420" y1="280" x2="1420" y2="288" class="tick"/>
+  <text x="56" y="300" class="tm">offset 0</text>
+  <text x="712" y="300" class="tm">18,675</text>
+  <text x="1378" y="300" class="tm">37,351</text>
+  <text x="1090" y="238" class="ts" fill="#16A34A">TEXT</text>
+  <text x="1140" y="238" class="ts" fill="#2563EB">SCHEDULE</text>
+  <text x="1215" y="238" class="ts" fill="#DC2626">DRAWING</text>
+
+  <!-- 3. SPAN SUBTRACTION -->
+  <text x="40" y="342" class="band">STEP 3 · SPAN SUBTRACTION — HOW ONE PAGE IS SPLIT (REAL NUMBERS, PAGE 8 OF THE ABB SAMPLE)</text>
+  <rect x="40" y="354" width="1400" height="256" class="grp"/>
+
+  <text x="60" y="382" class="t" font-weight="600">BEFORE — what Document Intelligence reports. The ranges OVERLAP.</text>
+  <rect x="140" y="394" width="1095" height="22" fill="#16A34A" opacity="0.35" rx="3"/>
+  <text x="60" y="410" class="tm">paragraphs</text>
+  <text x="1292" y="410" class="ts">25 reported</text>
+  <rect x="784" y="422" width="498" height="22" fill="#2563EB" opacity="0.75" rx="3"/>
+  <text x="60" y="438" class="tm">table[3]</text>
+  <text x="1292" y="438" class="tm">5973 → 6266</text>
+  <rect x="1287" y="450" width="31" height="22" fill="#DC2626" opacity="0.85" rx="3"/>
+  <text x="60" y="466" class="tm">figure[8.1]</text>
+  <text x="1328" y="466" class="tm">6269 → 6287</text>
+
+  <rect x="784" y="390" width="498" height="86" fill="none" stroke="#D13438" stroke-width="2" stroke-dasharray="4 3" rx="4"/>
+  <text x="800" y="494" class="ts" fill="#D13438">16 of the 25 &quot;paragraphs&quot; sit INSIDE the table range — they are its cells, reported a second time.</text>
+  <text x="800" y="512" class="ts" fill="#D13438">Consume &quot;all paragraphs on page 8&quot; and you send prose AND a shredded table to the narrative prompt.</text>
+  <text x="800" y="530" class="ts" fill="#D13438">That is &quot;OCR confuses table headers with annotations&quot;. The OCR is correct; the consumer is not.</text>
+
+  <text x="60" y="558" class="t" font-weight="600">AFTER — claim, then take what is left. Integers cannot be &quot;nearly&quot; right.</text>
+  <rect x="140" y="570" width="640" height="22" fill="#16A34A" opacity="0.85" rx="3"/>
+  <text x="150" y="586" class="tm" fill="#ffffff">TEXT · 9 paragraphs · 236 chars</text>
+  <rect x="784" y="570" width="498" height="22" fill="#2563EB" opacity="0.9" rx="3"/>
+  <text x="794" y="586" class="tm" fill="#ffffff">SCHEDULE · table[3] · 293 chars</text>
+  <rect x="1287" y="570" width="31" height="22" fill="#DC2626" opacity="0.9" rx="3"/>
+  <text x="1326" y="586" class="tm">DRAWING · 18</text>
+
+  <!-- 4. CLAIM ORDER -->
+  <text x="40" y="650" class="band">STEP 4 · CLAIM ORDER DEPENDS ON CONTENT TYPE</text>
+  <rect x="40" y="662" width="690" height="104" class="new"/>
+  <text x="58" y="686" class="t" font-weight="700" fill="#107C10">DRAWING segment → figure claims first</text>
+  <text x="58" y="706" class="ts">The title block, revision table and BOM are TABLES drawn inside the sheet.</text>
+  <text x="58" y="724" class="ts">A figure absorbs any table whose bounding box sits inside it (geometry, not proximity).</text>
+  <text x="58" y="748" class="ts" fill="#D13438">Without this, every drawing title block is routed to the schedule prompt.</text>
+
+  <rect x="750" y="662" width="690" height="104" class="box"/>
+  <text x="768" y="686" class="t" font-weight="600">SCHEDULE / TEXT segment → table claims first</text>
+  <text x="768" y="706" class="ts">A grid on a specification page is a real schedule; an adjacent illustration</text>
+  <text x="768" y="724" class="ts">must not swallow it.</text>
+  <text x="768" y="748" class="ts">subtract() gives the later claimant the REMAINDER, never nothing.</text>
+
+  <!-- 5. FAN OUT -->
+  <text x="40" y="806" class="band">STEP 5 · FAN OUT — MESSAGES CARRY POINTERS, WORKERS FINISH IN ANY ORDER</text>
+  <rect x="40" y="818" width="1400" height="160" class="grp"/>
+  <rect x="58" y="834" width="430" height="60" class="box"/>
+  <text x="74" y="856" class="t" font-weight="600">Service Bus message (≈400 bytes)</text>
+  <text x="74" y="876" class="tm">{segmentId, contentType, spans[], layoutUri, figures[]}</text>
+
+  <rect x="58" y="906" width="430" height="56" class="warn"/>
+  <text x="74" y="928" class="t" font-size="12" font-weight="600">Never split the PDF into sub-PDFs</text>
+  <text x="74" y="947" class="ts">That restarts offsets at 0, re-bills pages, and kills the tag lexicon.</text>
+
+  <rect x="520" y="834" width="280" height="128" class="boxw"/>
+  <text x="536" y="856" class="t" font-weight="600">Worker completion order</text>
+  <text x="536" y="880" class="tm">seg-003  DRAWING   t=4.1s</text>
+  <text x="536" y="900" class="tm">seg-007  DRAWING   t=4.4s</text>
+  <text x="536" y="920" class="tm">seg-001  DRAWING   t=6.2s</text>
+  <text x="536" y="940" class="tm">seg-004  SCHEDULE  t=9.7s</text>
+  <text x="536" y="958" class="ts">arbitrary — and it does not matter</text>
+
+  <rect x="830" y="834" width="290" height="128" class="new"/>
+  <text x="846" y="856" class="t" font-weight="700" fill="#107C10">Idempotency</text>
+  <text x="846" y="878" class="ts">Cosmos id is deterministic:</text>
+  <text x="846" y="898" class="tm">{jobId}:{fileId}:{segmentId}</text>
+  <text x="846" y="920" class="ts">Redelivery becomes an upsert.</text>
+  <text x="846" y="942" class="ts">Count DISTINCT terminal docs —</text>
+  <text x="846" y="960" class="ts">never increment a counter.</text>
+
+  <rect x="1150" y="834" width="290" height="128" class="boxw"/>
+  <text x="1166" y="856" class="t" font-weight="600">Cross-segment lexicon</text>
+  <text x="1166" y="878" class="ts">Tags harvested from SCHEDULE</text>
+  <text x="1166" y="896" class="ts">segments repair DRAWING tags:</text>
+  <text x="1166" y="918" class="tm" fill="#D13438">√{150-401}</text>
+  <text x="1252" y="918" class="tm">→ VFD-401</text>
+  <text x="1166" y="940" class="ts">Confusion-class match, and it</text>
+  <text x="1166" y="958" class="ts">REFUSES when ambiguous.</text>
+
+  <path d="M 488 864 L 520 864" class="ln"/>
+  <path d="M 800 898 L 830 898" class="ln"/>
+  <path d="M 1120 898 L 1150 898" class="ln"/>
+
+  <!-- 6. REASSEMBLY -->
+  <text x="40" y="1014" class="band">STEP 6 · REASSEMBLY — SORT BY (file_ordinal, span_offset). NEVER BY PAGE NUMBER.</text>
+  <rect x="40" y="1026" width="1400" height="92" class="grp"/>
+  <rect x="58" y="1042" width="410" height="60" class="new"/>
+  <text x="74" y="1064" class="t" font-weight="700" fill="#107C10">sorted(results, key=(fileOrdinal, startOffset))</text>
+  <text x="74" y="1084" class="ts">file_ordinal is frozen at job creation and never re-derived</text>
+
+  <rect x="490" y="1042" width="440" height="60" class="warn"/>
+  <text x="506" y="1064" class="t" font-size="12" font-weight="600">Page number is NOT a valid key</text>
+  <text x="506" y="1084" class="ts">A schedule and an inset diagram on page 12 share page == 12</text>
+
+  <rect x="952" y="1042" width="488" height="60" class="box"/>
+  <text x="968" y="1064" class="t" font-weight="600">Coverage proof: 100.00% accounted, 0 unexplained</text>
+  <text x="968" y="1084" class="ts">Precedence — specs: SCHEDULE&gt;TEXT&gt;DRAWING · pairs: DRAWING&gt;SCHEDULE&gt;TEXT</text>
+
+  <text x="40" y="1152" class="ts">Output: validated JobResult — motors, VFDs, applications, VFD–motor pairs, conflicts, review list — every value carrying page, span, polygon and section breadcrumb.</text>
+  <text x="40" y="1172" class="ts" fill="#D13438">Partial failure yields REVIEW with explicit holes. A silently shortened result is more dangerous than an obviously incomplete one.</text>
+</svg>

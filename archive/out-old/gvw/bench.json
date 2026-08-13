@@ -1,0 +1,134 @@
+{
+  "rows": [
+    {
+      "producer": "di-layout",
+      "document": "mixed_package.pdf",
+      "ok": true,
+      "error": null,
+      "pages": 18,
+      "segments": 4,
+      "regions": 70,
+      "multi_kind_pages": 18,
+      "kinds_found": [
+        "DRAWING",
+        "SCHEDULE",
+        "TEXT"
+      ],
+      "coverage_ratio": 1.0,
+      "unexplained_chars": 0,
+      "section_nodes": 4,
+      "section_strategy": "roles",
+      "segments_with_breadcrumb": 4,
+      "mean_confidence": 0.449,
+      "review_segments": 0,
+      "api_calls": 1,
+      "usd_estimate": 0.18,
+      "usd_per_page": 0.01,
+      "seconds": 3.46,
+      "warnings": []
+    },
+    {
+      "producer": "content-understanding",
+      "document": "mixed_package.pdf",
+      "ok": true,
+      "error": null,
+      "pages": 18,
+      "segments": 18,
+      "regions": 45,
+      "multi_kind_pages": 18,
+      "kinds_found": [
+        "DRAWING",
+        "SCHEDULE",
+        "TEXT"
+      ],
+      "coverage_ratio": 1.0,
+      "unexplained_chars": 0,
+      "section_nodes": 11,
+      "section_strategy": "content-understanding-roles",
+      "segments_with_breadcrumb": 18,
+      "mean_confidence": 1.0,
+      "review_segments": 0,
+      "api_calls": 1,
+      "usd_estimate": 0.18,
+      "usd_per_page": 0.01,
+      "seconds": 15.25,
+      "warnings": [
+        "classifier granularity is one page; intra-page regions come from the layout model, not the classifier"
+      ]
+    },
+    {
+      "producer": "hybrid-cu-di",
+      "document": "mixed_package.pdf",
+      "ok": true,
+      "error": null,
+      "pages": 18,
+      "segments": 2,
+      "regions": 70,
+      "multi_kind_pages": 18,
+      "kinds_found": [
+        "DRAWING",
+        "SCHEDULE",
+        "TEXT"
+      ],
+      "coverage_ratio": 1.0,
+      "unexplained_chars": 0,
+      "section_nodes": 4,
+      "section_strategy": "roles",
+      "segments_with_breadcrumb": 2,
+      "mean_confidence": 1.0,
+      "review_segments": 0,
+      "api_calls": 2,
+      "usd_estimate": 0.36,
+      "usd_per_page": 0.01,
+      "seconds": 21.09,
+      "warnings": [
+        "classifier granularity is one page; intra-page regions come from the layout model, not the classifier"
+      ]
+    }
+  ],
+  "summary": {
+    "content-understanding": {
+      "documents": 1,
+      "failed": 0,
+      "pages": 18,
+      "coverage_ratio": 1.0,
+      "unexplained_chars": 0,
+      "multi_kind_page_rate": 1.0,
+      "breadcrumb_rate": 1.0,
+      "review_rate": 0.0,
+      "usd_per_page": 0.01,
+      "seconds_per_page": 0.847,
+      "warnings": [
+        "classifier granularity is one page; intra-page regions come from the layout model, not the classifier"
+      ]
+    },
+    "di-layout": {
+      "documents": 1,
+      "failed": 0,
+      "pages": 18,
+      "coverage_ratio": 1.0,
+      "unexplained_chars": 0,
+      "multi_kind_page_rate": 1.0,
+      "breadcrumb_rate": 1.0,
+      "review_rate": 0.0,
+      "usd_per_page": 0.01,
+      "seconds_per_page": 0.192,
+      "warnings": []
+    },
+    "hybrid-cu-di": {
+      "documents": 1,
+      "failed": 0,
+      "pages": 18,
+      "coverage_ratio": 1.0,
+      "unexplained_chars": 0,
+      "multi_kind_page_rate": 1.0,
+      "breadcrumb_rate": 1.0,
+      "review_rate": 0.0,
+      "usd_per_page": 0.02,
+      "seconds_per_page": 1.172,
+      "warnings": [
+        "classifier granularity is one page; intra-page regions come from the layout model, not the classifier"
+      ]
+    }
+  }
+}

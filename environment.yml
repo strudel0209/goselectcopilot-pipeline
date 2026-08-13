@@ -1,0 +1,40 @@
+# conda-forge only.
+#
+# This network blocks files.pythonhosted.org (PyPI's wheel CDN) but allows
+# conda.anaconda.org. Every dependency below is available on conda-forge,
+# including the exact azure-ai-documentintelligence 1.0.2.
+#
+# Do NOT add the `defaults` channel — it carries Anaconda's commercial terms
+# for large organisations. conda-forge is community-licensed.
+
+name: goselect
+
+channels:
+  - conda-forge
+
+dependencies:
+  - python=3.12
+
+  # Azure AI Document Intelligence v4.0 (API 2024-11-30)
+  - azure-ai-documentintelligence=1.0.2
+  - azure-identity
+
+  # goselect_docproc runtime
+  - pydantic>=2.7    # contracts.py - the integration surface
+  - pillow           # tiling.py - drawing crops
+  - python-dotenv
+  - rapidfuzz        # tag lexicon snapping
+  - pymupdf          # page rendering for the overlay check
+
+  # notebook / analysis extras
+  - numpy
+  - pandas
+  - matplotlib-base  # -base avoids pulling Qt into a headless container
+  - ipykernel
+
+  # dev
+  - pytest
+  - cairosvg         # renders docs/*.svg for review
+
+# Mistral OCR is called over its REST API with the standard library, so no
+# `mistralai` package is required. The conda-forge build lags `include_blocks`.

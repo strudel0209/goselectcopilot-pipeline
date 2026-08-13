@@ -1,0 +1,166 @@
+{
+  "document": "98878_1_HoweyVFDs.pdf",
+  "scan_quality": "scanned",
+  "_provenance": "Hand-labelled from the source PDF. Howey-in-the-Hills FL, Water Treatment Plant No. 3, 90% submittal (Halff). Section 16370 Variable Frequency Drives, pp1-7, plus two elementary-diagram sheets E-08 and E-07.",
+
+  "pages": {
+    "1": "TEXT", "2": "TEXT", "3": "TEXT", "4": "TEXT",
+    "5": "TEXT", "6": "TEXT", "7": "TEXT",
+    "8": "DRAWING", "9": "DRAWING"
+  },
+
+  "sections": {
+    "1": "16370", "2": "16370", "3": "16370",
+    "4": "16370", "5": "16370", "6": "16370", "7": "16370"
+  },
+
+  "headings": [
+    "SECTION 16370 VARIABLE FREQUENCY DRIVES",
+    "PART 1 - GENERAL",
+    "1.01 SCOPE OF WORK",
+    "1.02 DESCRIPTION OF SYSTEM",
+    "1.03 QUALIFICATIONS",
+    "1.04 SUBMITTALS",
+    "1.05 TOOLS AND SPARE PARTS",
+    "1.06 PRODUCT HANDLING",
+    "1.07 WARRANTY",
+    "PART 2 - PRODUCTS",
+    "2.01 GENERAL",
+    "2.02 CONSTRUCTION",
+    "PART 3 - EXECUTION",
+    "3.01 GENERAL",
+    "3.02 INSTALLATION",
+    "3.03 START UP",
+    "3.04 TRAINING",
+    "3.05 TESTS AND CHECKS"
+  ],
+  "_section_index_notes": "18 headings, all on pp1-7. Nothing on pp8-9 is a heading: the drawing sheets contain no document structure. Any node emitted from p8 or p9 is a false positive.",
+
+  "tags": [],
+  "pairs": [],
+  "_pairing_note": "This file asserts NO VFD-motor pairs. Section 16370 is a generic requirement clause covering every drive on the project; 1.03.A explicitly defers ampacity to the single-line diagram on the electrical sheets. Equipment tags live in 98878_2_HoweyOneline.pdf. A run over this file alone that returns a non-empty vfd_motor_pairs[] has hallucinated it.",
+
+  "value_grounding": [
+    {
+      "path": "vfd.manufacturer",
+      "value": "ABB",
+      "page": 1,
+      "clause": "1.03 QUALIFICATIONS",
+      "verbatim": "VFDs shall be ABB ACQ580, no equal."
+    },
+    {
+      "path": "vfd.product_name",
+      "value": "ACQ580",
+      "page": 1,
+      "clause": "1.03 QUALIFICATIONS",
+      "verbatim": "VFDs shall be ABB ACQ580, no equal."
+    },
+    {
+      "path": "vfd.harmonic_mitigation",
+      "value": "integrally mounted passive filter",
+      "page": 1,
+      "clause": "1.02 DESCRIPTION OF SYSTEM",
+      "verbatim": "All variable frequency drives shall be provided with integrally mounted passive filters."
+    },
+    {
+      "path": "vfd.electrical.input_voltage",
+      "value": 460,
+      "unit": "V",
+      "page": 3,
+      "clause": "2.02 CONSTRUCTION",
+      "verbatim": "Each variable frequency drive shall consist of a 460V, 3 phase rectifier"
+    },
+    {
+      "path": "vfd.electrical.input_phases",
+      "value": 3,
+      "page": 3,
+      "clause": "2.02 CONSTRUCTION",
+      "verbatim": "460V, 3 phase rectifier"
+    },
+    {
+      "path": "vfd.electrical.input_frequency",
+      "value": 60,
+      "unit": "Hz",
+      "page": 3,
+      "clause": "2.02 CONSTRUCTION",
+      "verbatim": "incoming three phase, 460V (+10 to -5%) and 60 Hertz (+/-2) Hertz power"
+    },
+    {
+      "path": "vfd.electrical.output_frequency_min",
+      "value": 1,
+      "unit": "Hz",
+      "page": 4,
+      "clause": "2.02 CONSTRUCTION",
+      "verbatim": "Minimum speed (1 to 60 HZ).",
+      "_contested": true,
+      "_note": "AMBIGUOUS IN THE SOURCE - needs ABB adjudication, not a better model. Clause 2.02.H.1 'Minimum speed (1 to 60 HZ)' gives 1 Hz; clause 2.02.F.4 'Variable torque performance from 4 to 60 Hertz' gives 4 Hz. In a bake-off gpt-5.4-mini returned 4 citing F.4 and gpt-5.6-sol returned 1 citing H.1; both citations are real and verifiable. Until ABB rules, this is a Conflict to surface, not an extraction error to score."
+    },
+    {
+      "path": "vfd.electrical.output_frequency_max",
+      "value": 60,
+      "unit": "Hz",
+      "page": 4,
+      "clause": "2.02 CONSTRUCTION",
+      "verbatim": "Maximum speed (1 to 60 HZ)."
+    },
+    {
+      "path": "vfd.features[]",
+      "value": "65,000 AIC minimum short circuit rating",
+      "page": 4,
+      "clause": "2.02 CONSTRUCTION",
+      "verbatim": "Minimum short circuit rating of 65,000 AIC shall be provided."
+    },
+    {
+      "path": "vfd.features[]",
+      "value": "EtherNet/IP interface to PICS network",
+      "page": 3,
+      "clause": "2.01 GENERAL",
+      "verbatim": "The VFD shall each be equipped with a Ethernet/IP interface for connection into the PICS network."
+    },
+    {
+      "path": "vfd.certifications[]",
+      "value": "UL 508A / cUL (harmonic filter)",
+      "page": 5,
+      "clause": "2.02 CONSTRUCTION",
+      "verbatim": "The filter shall be UL- and cUL-Listed under UL 508A."
+    },
+    {
+      "path": "vfd.certifications[]",
+      "value": "ANSI, NEMA, IEEE, NEC",
+      "page": 3,
+      "clause": "2.01 GENERAL",
+      "verbatim": "shall be complied with the latest applicable standards of ANSI, NEMA, IEEE, and the National Electric Code"
+    },
+    {
+      "path": "application.ambient_temperature",
+      "value": "0 to 40",
+      "unit": "degC",
+      "page": 3,
+      "clause": "2.02 CONSTRUCTION",
+      "verbatim": "rated for an ambient temperature of 0oC to 40oC"
+    },
+    {
+      "path": "application.altitude",
+      "value": 3300,
+      "unit": "ft",
+      "page": 3,
+      "clause": "2.02 CONSTRUCTION",
+      "verbatim": "an altitude of up to 3,300 feet above sea level"
+    },
+    {
+      "path": "vfd.electrical.input_current",
+      "value": 124,
+      "unit": "A",
+      "page": 8,
+      "clause": null,
+      "verbatim": "2\u00d7 124 Amp",
+      "_note": "HANDWRITTEN annotation on drawing sheet E-08, no clause. Applies to the two well-pump starters, not to a VFD. Read correctly by DI Layout."
+    }
+  ],
+
+  "_traps": [
+    "pp8-9 are landscape scanned drawing sheets. Their title blocks are tables inside a figure and must be claimed by the DRAWING region, not emitted as a schedule.",
+    "The handwritten ampacities are the only source for drive sizing and appear on no printed line.",
+    "Sheet E-08 covers WELL PUMP SOLID STATE STARTERS, which are not VFDs. Section 16370 does not apply to them."
+  ]
+}

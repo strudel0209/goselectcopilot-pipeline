@@ -1,0 +1,808 @@
+{
+  "schema_version": "1.0.0",
+  "job_id": "6633f8c6-e8a2-4d7e-b117-0ee1e82826de",
+  "correlation_id": "00e71170-6201-411e-95d3-9b7001b8a9fe",
+  "created_at": "2026-08-13T09:51:52.975340Z",
+  "files": [
+    {
+      "file_id": "f1",
+      "ordinal": 0,
+      "source_uri": "file:///workspaces/MODP/sample_docs/98878_1_HoweyVFDs.pdf",
+      "page_count": 9,
+      "content_sha256": "47f410e1870a7b27b5771278848d4955548710068a076282fccfdcb9667d5df2",
+      "content_chars": 21912
+    }
+  ],
+  "segments": [
+    {
+      "segment_id": "f1-seg-001",
+      "file_id": "f1",
+      "first_page": 1,
+      "last_page": 7,
+      "content_type": "TEXT",
+      "confidence": 0.306,
+      "page_confidences": [
+        0.869,
+        0.863,
+        0.865,
+        0.845,
+        0.86,
+        0.871,
+        0.306
+      ],
+      "section_root": "SECTION 16370 VARIABLE FREQUENCY DRIVES",
+      "regions": [
+        {
+          "kind": "TEXT",
+          "ref": "paragraphs[16]",
+          "page": 1,
+          "spans": [
+            {
+              "offset": 0,
+              "length": 41
+            },
+            {
+              "offset": 44,
+              "length": 19
+            },
+            {
+              "offset": 66,
+              "length": 22
+            },
+            {
+              "offset": 90,
+              "length": 235
+            },
+            {
+              "offset": 327,
+              "length": 423
+            },
+            {
+              "offset": 753,
+              "length": 30
+            },
+            {
+              "offset": 785,
+              "length": 175
+            },
+            {
+              "offset": 962,
+              "length": 203
+            },
+            {
+              "offset": 1167,
+              "length": 91
+            },
+            {
+              "offset": 1260,
+              "length": 105
+            },
+            {
+              "offset": 1368,
+              "length": 23
+            },
+            {
+              "offset": 1393,
+              "length": 458
+            },
+            {
+              "offset": 1853,
+              "length": 364
+            },
+            {
+              "offset": 2219,
+              "length": 334
+            },
+            {
+              "offset": 2555,
+              "length": 289
+            },
+            {
+              "offset": 2846,
+              "length": 38
+            }
+          ],
+          "polygon": null,
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "TEXT",
+          "ref": "paragraphs[17]",
+          "page": 2,
+          "spans": [
+            {
+              "offset": 2939,
+              "length": 18
+            },
+            {
+              "offset": 2959,
+              "length": 152
+            },
+            {
+              "offset": 3113,
+              "length": 125
+            },
+            {
+              "offset": 3240,
+              "length": 71
+            },
+            {
+              "offset": 3313,
+              "length": 214
+            },
+            {
+              "offset": 3529,
+              "length": 390
+            },
+            {
+              "offset": 3921,
+              "length": 76
+            },
+            {
+              "offset": 3999,
+              "length": 211
+            },
+            {
+              "offset": 4213,
+              "length": 29
+            },
+            {
+              "offset": 4244,
+              "length": 185
+            },
+            {
+              "offset": 4432,
+              "length": 24
+            },
+            {
+              "offset": 4458,
+              "length": 223
+            },
+            {
+              "offset": 4683,
+              "length": 117
+            },
+            {
+              "offset": 4802,
+              "length": 138
+            },
+            {
+              "offset": 4942,
+              "length": 99
+            },
+            {
+              "offset": 5044,
+              "length": 16
+            },
+            {
+              "offset": 5062,
+              "length": 585
+            }
+          ],
+          "polygon": null,
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "TEXT",
+          "ref": "paragraphs[21]",
+          "page": 3,
+          "spans": [
+            {
+              "offset": 5702,
+              "length": 20
+            },
+            {
+              "offset": 5725,
+              "length": 16
+            },
+            {
+              "offset": 5743,
+              "length": 194
+            },
+            {
+              "offset": 5939,
+              "length": 120
+            },
+            {
+              "offset": 6061,
+              "length": 174
+            },
+            {
+              "offset": 6237,
+              "length": 140
+            },
+            {
+              "offset": 6379,
+              "length": 101
+            },
+            {
+              "offset": 6482,
+              "length": 214
+            },
+            {
+              "offset": 6698,
+              "length": 100
+            },
+            {
+              "offset": 6801,
+              "length": 21
+            },
+            {
+              "offset": 6824,
+              "length": 258
+            },
+            {
+              "offset": 7084,
+              "length": 336
+            },
+            {
+              "offset": 7422,
+              "length": 204
+            },
+            {
+              "offset": 7628,
+              "length": 160
+            },
+            {
+              "offset": 7790,
+              "length": 48
+            },
+            {
+              "offset": 7840,
+              "length": 83
+            },
+            {
+              "offset": 7925,
+              "length": 141
+            },
+            {
+              "offset": 8068,
+              "length": 54
+            },
+            {
+              "offset": 8124,
+              "length": 51
+            },
+            {
+              "offset": 8177,
+              "length": 51
+            },
+            {
+              "offset": 8230,
+              "length": 108
+            }
+          ],
+          "polygon": null,
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "TEXT",
+          "ref": "paragraphs[22]",
+          "page": 4,
+          "spans": [
+            {
+              "offset": 8392,
+              "length": 132
+            },
+            {
+              "offset": 8526,
+              "length": 47
+            },
+            {
+              "offset": 8575,
+              "length": 37
+            },
+            {
+              "offset": 8614,
+              "length": 151
+            },
+            {
+              "offset": 8767,
+              "length": 68
+            },
+            {
+              "offset": 8837,
+              "length": 262
+            },
+            {
+              "offset": 9101,
+              "length": 70
+            },
+            {
+              "offset": 9173,
+              "length": 53
+            },
+            {
+              "offset": 9228,
+              "length": 30
+            },
+            {
+              "offset": 9260,
+              "length": 32
+            },
+            {
+              "offset": 9294,
+              "length": 51
+            },
+            {
+              "offset": 9347,
+              "length": 142
+            },
+            {
+              "offset": 9491,
+              "length": 110
+            },
+            {
+              "offset": 9603,
+              "length": 80
+            },
+            {
+              "offset": 9685,
+              "length": 732
+            },
+            {
+              "offset": 10419,
+              "length": 84
+            },
+            {
+              "offset": 10505,
+              "length": 31
+            },
+            {
+              "offset": 10538,
+              "length": 31
+            },
+            {
+              "offset": 10571,
+              "length": 34
+            },
+            {
+              "offset": 10607,
+              "length": 35
+            },
+            {
+              "offset": 10644,
+              "length": 20
+            },
+            {
+              "offset": 10666,
+              "length": 38
+            }
+          ],
+          "polygon": null,
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "TEXT",
+          "ref": "paragraphs[22]",
+          "page": 5,
+          "spans": [
+            {
+              "offset": 10758,
+              "length": 102
+            },
+            {
+              "offset": 10862,
+              "length": 125
+            },
+            {
+              "offset": 10989,
+              "length": 36
+            },
+            {
+              "offset": 11027,
+              "length": 293
+            },
+            {
+              "offset": 11322,
+              "length": 147
+            },
+            {
+              "offset": 11471,
+              "length": 273
+            },
+            {
+              "offset": 11746,
+              "length": 57
+            },
+            {
+              "offset": 11805,
+              "length": 227
+            },
+            {
+              "offset": 12034,
+              "length": 63
+            },
+            {
+              "offset": 12099,
+              "length": 82
+            },
+            {
+              "offset": 12183,
+              "length": 188
+            },
+            {
+              "offset": 12373,
+              "length": 55
+            },
+            {
+              "offset": 12430,
+              "length": 58
+            },
+            {
+              "offset": 12490,
+              "length": 49
+            },
+            {
+              "offset": 12541,
+              "length": 42
+            },
+            {
+              "offset": 12585,
+              "length": 68
+            },
+            {
+              "offset": 12656,
+              "length": 21
+            },
+            {
+              "offset": 12680,
+              "length": 16
+            },
+            {
+              "offset": 12698,
+              "length": 86
+            },
+            {
+              "offset": 12787,
+              "length": 21
+            },
+            {
+              "offset": 12810,
+              "length": 242
+            },
+            {
+              "offset": 13054,
+              "length": 184
+            }
+          ],
+          "polygon": null,
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "TEXT",
+          "ref": "paragraphs[19]",
+          "page": 6,
+          "spans": [
+            {
+              "offset": 13292,
+              "length": 160
+            },
+            {
+              "offset": 13454,
+              "length": 198
+            },
+            {
+              "offset": 13655,
+              "length": 17
+            },
+            {
+              "offset": 13674,
+              "length": 843
+            },
+            {
+              "offset": 14520,
+              "length": 17
+            },
+            {
+              "offset": 14539,
+              "length": 87
+            },
+            {
+              "offset": 14628,
+              "length": 206
+            },
+            {
+              "offset": 14836,
+              "length": 162
+            },
+            {
+              "offset": 15000,
+              "length": 147
+            },
+            {
+              "offset": 15149,
+              "length": 167
+            },
+            {
+              "offset": 15318,
+              "length": 23
+            },
+            {
+              "offset": 15343,
+              "length": 19
+            },
+            {
+              "offset": 15364,
+              "length": 19
+            },
+            {
+              "offset": 15385,
+              "length": 296
+            },
+            {
+              "offset": 15684,
+              "length": 25
+            },
+            {
+              "offset": 15711,
+              "length": 154
+            },
+            {
+              "offset": 15867,
+              "length": 86
+            },
+            {
+              "offset": 15955,
+              "length": 52
+            },
+            {
+              "offset": 16009,
+              "length": 159
+            }
+          ],
+          "polygon": null,
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "TEXT",
+          "ref": "paragraphs[7]",
+          "page": 7,
+          "spans": [
+            {
+              "offset": 16222,
+              "length": 143
+            },
+            {
+              "offset": 16367,
+              "length": 75
+            },
+            {
+              "offset": 16444,
+              "length": 81
+            },
+            {
+              "offset": 16527,
+              "length": 189
+            },
+            {
+              "offset": 16718,
+              "length": 57
+            },
+            {
+              "offset": 16777,
+              "length": 40
+            },
+            {
+              "offset": 16819,
+              "length": 14
+            }
+          ],
+          "polygon": null,
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        }
+      ],
+      "producer": "di-layout-heuristic-v1"
+    },
+    {
+      "segment_id": "f1-seg-002",
+      "file_id": "f1",
+      "first_page": 8,
+      "last_page": 9,
+      "content_type": "DRAWING",
+      "confidence": 0.589,
+      "page_confidences": [
+        0.798,
+        0.589
+      ],
+      "section_root": null,
+      "regions": [
+        {
+          "kind": "DRAWING",
+          "ref": "figure[8.1]",
+          "page": 8,
+          "spans": [
+            {
+              "offset": 16888,
+              "length": 1796
+            }
+          ],
+          "polygon": [
+            7.5198,
+            0.5742,
+            7.5795,
+            10.3885,
+            0.986,
+            10.4298,
+            0.9269,
+            0.6158
+          ],
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "DRAWING",
+          "ref": "figure[9.1]",
+          "page": 9,
+          "spans": [
+            {
+              "offset": 18708,
+              "length": 3203
+            }
+          ],
+          "polygon": [
+            7.4612,
+            0.5686,
+            7.4663,
+            10.4396,
+            0.9218,
+            10.4456,
+            0.917,
+            0.5742
+          ],
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        }
+      ],
+      "producer": "di-layout-heuristic-v1"
+    }
+  ],
+  "section_index": [
+    {
+      "offset": 0,
+      "heading": "SECTION 16370 VARIABLE FREQUENCY DRIVES",
+      "page": 1,
+      "level": 1
+    },
+    {
+      "offset": 44,
+      "heading": "PART 1 - GENERAL",
+      "page": 1,
+      "level": 2
+    },
+    {
+      "offset": 66,
+      "heading": "1.01 SCOPE OF WORK",
+      "page": 1,
+      "level": 3
+    },
+    {
+      "offset": 753,
+      "heading": "1.02 DESCRIPTION OF SYSTEM",
+      "page": 1,
+      "level": 3
+    },
+    {
+      "offset": 1368,
+      "heading": "1.03 QUALIFICATIONS",
+      "page": 1,
+      "level": 3
+    },
+    {
+      "offset": 2939,
+      "heading": "1.04 SUBMITTALS",
+      "page": 2,
+      "level": 2
+    },
+    {
+      "offset": 4213,
+      "heading": "1.05 TOOLS AND SPARE PARTS",
+      "page": 2,
+      "level": 2
+    },
+    {
+      "offset": 4432,
+      "heading": "1.06 PRODUCT HANDLING",
+      "page": 2,
+      "level": 2
+    },
+    {
+      "offset": 5044,
+      "heading": "1.07 WARRANTY",
+      "page": 2,
+      "level": 2
+    },
+    {
+      "offset": 5702,
+      "heading": "PART 2 - PRODUCTS",
+      "page": 3,
+      "level": 2
+    },
+    {
+      "offset": 5725,
+      "heading": "2.01 GENERAL",
+      "page": 3,
+      "level": 3
+    },
+    {
+      "offset": 6801,
+      "heading": "2.02 CONSTRUCTION",
+      "page": 3,
+      "level": 3
+    },
+    {
+      "offset": 12656,
+      "heading": "PART 3 - EXECUTION",
+      "page": 5,
+      "level": 2
+    },
+    {
+      "offset": 12680,
+      "heading": "3.01 GENERAL",
+      "page": 5,
+      "level": 3
+    },
+    {
+      "offset": 12787,
+      "heading": "3.02 INSTALLATION",
+      "page": 5,
+      "level": 3
+    },
+    {
+      "offset": 13655,
+      "heading": "3.03 START UP",
+      "page": 6,
+      "level": 3
+    },
+    {
+      "offset": 14520,
+      "heading": "3.04 TRAINING",
+      "page": 6,
+      "level": 3
+    },
+    {
+      "offset": 15684,
+      "heading": "3.05 TESTS AND CHECKS",
+      "page": 6,
+      "level": 3
+    },
+    {
+      "offset": 18708,
+      "heading": "3 \u00d7 124 Amp 1\u00d7 65 Amp",
+      "page": 9,
+      "level": 1
+    },
+    {
+      "offset": 20071,
+      "heading": "NOTES:",
+      "page": 9,
+      "level": 2
+    }
+  ],
+  "coverage": {
+    "f1": {
+      "total_chars": 21912,
+      "covered_chars": 21257,
+      "furniture_chars": 655,
+      "unexplained_chars": 0,
+      "unexplained_samples": []
+    }
+  },
+  "producer": "di-layout"
+}

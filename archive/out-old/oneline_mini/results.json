@@ -1,0 +1,29 @@
+[
+  {
+    "schema_version": "1.0.0",
+    "id": "3c221ec7-73ee-4b96-8241-2ee71e280824:f1:f1-seg-001",
+    "job_id": "3c221ec7-73ee-4b96-8241-2ee71e280824",
+    "correlation_id": "7cc3e57e-94ba-42ca-a5f6-f8c5ecb3ca9a",
+    "file_id": "f1",
+    "file_ordinal": 0,
+    "segment_id": "f1-seg-001",
+    "content_type": "DRAWING",
+    "status": "DONE",
+    "start_offset": 0,
+    "attempts": 1,
+    "model": "gpt-5.4-mini",
+    "latency_ms": 8953,
+    "input_tokens": null,
+    "output_tokens": null,
+    "payload": {
+      "motors": [],
+      "vfds": [],
+      "applications": [],
+      "pairs": [],
+      "notes": [
+        "No clearly readable motor-to-drive connection lines were visible for a confident pairing extraction."
+      ]
+    },
+    "errors": []
+  }
+]

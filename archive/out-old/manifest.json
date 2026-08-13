@@ -1,0 +1,2297 @@
+{
+  "schema_version": "1.0.0",
+  "job_id": "94384410-3c10-433a-85a4-d018793cbe0a",
+  "correlation_id": "788c1af6-b4d5-4e12-b4c9-ff1142fb787c",
+  "created_at": "2026-08-07T13:24:20.482034Z",
+  "files": [
+    {
+      "file_id": "f1",
+      "ordinal": 0,
+      "source_uri": "file:///workspaces/MODP/sample_docs/mixed_package.pdf",
+      "page_count": 20,
+      "content_sha256": "b57ba8a6cf3aba3ba57dd6ceddcad4d375797f55e56d57a3354358f969041d48",
+      "content_chars": 37351
+    }
+  ],
+  "segments": [
+    {
+      "segment_id": "f1-seg-001",
+      "file_id": "f1",
+      "first_page": 1,
+      "last_page": 6,
+      "content_type": "DRAWING",
+      "confidence": 0.177,
+      "page_confidences": [
+        0.913,
+        0.428,
+        0.177,
+        0.369,
+        0.432,
+        0.885
+      ],
+      "section_root": null,
+      "regions": [
+        {
+          "kind": "TEXT",
+          "ref": "paragraphs[4]",
+          "page": 1,
+          "spans": [
+            {
+              "offset": 10,
+              "length": 3
+            },
+            {
+              "offset": 83,
+              "length": 66
+            },
+            {
+              "offset": 182,
+              "length": 2
+            },
+            {
+              "offset": 186,
+              "length": 193
+            }
+          ],
+          "polygon": null,
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "DRAWING",
+          "ref": "figure[1.2]",
+          "page": 1,
+          "spans": [
+            {
+              "offset": 152,
+              "length": 27
+            }
+          ],
+          "polygon": [
+            0.7859,
+            4.4973,
+            5.975,
+            4.5013,
+            5.9728,
+            8.477,
+            0.7839,
+            8.4726
+          ],
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "TEXT",
+          "ref": "paragraphs[1]",
+          "page": 2,
+          "spans": [
+            {
+              "offset": 537,
+              "length": 159
+            }
+          ],
+          "polygon": null,
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "TEXT",
+          "ref": "paragraphs[1]",
+          "page": 3,
+          "spans": [
+            {
+              "offset": 743,
+              "length": 119
+            }
+          ],
+          "polygon": null,
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "SCHEDULE",
+          "ref": "table[0]",
+          "page": 3,
+          "spans": [
+            {
+              "offset": 865,
+              "length": 282
+            }
+          ],
+          "polygon": [
+            3.5521,
+            3.6428,
+            6.6398,
+            3.6416,
+            6.6399,
+            5.5803,
+            3.5525,
+            5.5821
+          ],
+          "rows": 5,
+          "columns": 2,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "TEXT",
+          "ref": "paragraphs[4]",
+          "page": 4,
+          "spans": [
+            {
+              "offset": 1290,
+              "length": 4
+            },
+            {
+              "offset": 1297,
+              "length": 22
+            },
+            {
+              "offset": 1322,
+              "length": 5
+            },
+            {
+              "offset": 1329,
+              "length": 331
+            }
+          ],
+          "polygon": null,
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "DRAWING",
+          "ref": "figure[5.1]",
+          "page": 5,
+          "spans": [
+            {
+              "offset": 1750,
+              "length": 18
+            }
+          ],
+          "polygon": [
+            0.0102,
+            0.8914,
+            7.6822,
+            0.8916,
+            7.6838,
+            5.8387,
+            0.011,
+            5.839
+          ],
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "DRAWING",
+          "ref": "figure[5.2]",
+          "page": 5,
+          "spans": [
+            {
+              "offset": 1771,
+              "length": 18
+            }
+          ],
+          "polygon": [
+            0.023,
+            5.966,
+            7.6922,
+            5.9671,
+            7.6889,
+            11.1092,
+            0.0194,
+            11.108
+          ],
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "TEXT",
+          "ref": "paragraphs[24]",
+          "page": 6,
+          "spans": [
+            {
+              "offset": 1932,
+              "length": 4
+            },
+            {
+              "offset": 1939,
+              "length": 22
+            },
+            {
+              "offset": 2099,
+              "length": 15
+            },
+            {
+              "offset": 2116,
+              "length": 17
+            },
+            {
+              "offset": 2135,
+              "length": 22
+            },
+            {
+              "offset": 2159,
+              "length": 15
+            },
+            {
+              "offset": 2176,
+              "length": 12
+            },
+            {
+              "offset": 2190,
+              "length": 19
+            },
+            {
+              "offset": 2211,
+              "length": 30
+            },
+            {
+              "offset": 2243,
+              "length": 29
+            },
+            {
+              "offset": 2274,
+              "length": 23
+            },
+            {
+              "offset": 2299,
+              "length": 33
+            },
+            {
+              "offset": 2334,
+              "length": 12
+            },
+            {
+              "offset": 2348,
+              "length": 12
+            },
+            {
+              "offset": 2362,
+              "length": 14
+            },
+            {
+              "offset": 1985,
+              "length": 99
+            },
+            {
+              "offset": 2390,
+              "length": 21
+            },
+            {
+              "offset": 2413,
+              "length": 249
+            },
+            {
+              "offset": 2665,
+              "length": 23
+            },
+            {
+              "offset": 2690,
+              "length": 61
+            },
+            {
+              "offset": 2754,
+              "length": 22
+            },
+            {
+              "offset": 2778,
+              "length": 59
+            },
+            {
+              "offset": 2839,
+              "length": 46
+            },
+            {
+              "offset": 2887,
+              "length": 52
+            }
+          ],
+          "polygon": null,
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "DRAWING",
+          "ref": "figure[6.2]",
+          "page": 6,
+          "spans": [
+            {
+              "offset": 2942,
+              "length": 18
+            }
+          ],
+          "polygon": [
+            0.5732,
+            5.9865,
+            8.2097,
+            5.9852,
+            8.2104,
+            11.0812,
+            0.5738,
+            11.0821
+          ],
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        }
+      ],
+      "producer": "di-layout-heuristic-v1"
+    },
+    {
+      "segment_id": "f1-seg-002",
+      "file_id": "f1",
+      "first_page": 7,
+      "last_page": 7,
+      "content_type": "SCHEDULE",
+      "confidence": 0.32,
+      "page_confidences": [
+        0.32
+      ],
+      "section_root": "Excitation systems",
+      "regions": [
+        {
+          "kind": "SCHEDULE",
+          "ref": "table[1]",
+          "page": 7,
+          "spans": [
+            {
+              "offset": 3051,
+              "length": 247
+            }
+          ],
+          "polygon": [
+            1.7844,
+            2.3255,
+            7.6814,
+            2.3255,
+            7.6837,
+            3.061,
+            1.7861,
+            3.061
+          ],
+          "rows": 4,
+          "columns": 3,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "TEXT",
+          "ref": "paragraphs[22]",
+          "page": 7,
+          "spans": [
+            {
+              "offset": 3301,
+              "length": 24
+            },
+            {
+              "offset": 3327,
+              "length": 24
+            },
+            {
+              "offset": 3354,
+              "length": 13
+            },
+            {
+              "offset": 3369,
+              "length": 53
+            },
+            {
+              "offset": 3425,
+              "length": 27
+            },
+            {
+              "offset": 3454,
+              "length": 32
+            },
+            {
+              "offset": 3488,
+              "length": 32
+            },
+            {
+              "offset": 3522,
+              "length": 82
+            },
+            {
+              "offset": 3607,
+              "length": 14
+            },
+            {
+              "offset": 3623,
+              "length": 21
+            },
+            {
+              "offset": 3646,
+              "length": 202
+            },
+            {
+              "offset": 3851,
+              "length": 20
+            },
+            {
+              "offset": 3873,
+              "length": 149
+            },
+            {
+              "offset": 4025,
+              "length": 12
+            },
+            {
+              "offset": 4039,
+              "length": 32
+            },
+            {
+              "offset": 4073,
+              "length": 28
+            },
+            {
+              "offset": 4103,
+              "length": 17
+            },
+            {
+              "offset": 4122,
+              "length": 47
+            },
+            {
+              "offset": 4171,
+              "length": 49
+            },
+            {
+              "offset": 4222,
+              "length": 40
+            },
+            {
+              "offset": 4264,
+              "length": 40
+            },
+            {
+              "offset": 4307,
+              "length": 22
+            }
+          ],
+          "polygon": null,
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "SCHEDULE",
+          "ref": "table[2]",
+          "page": 7,
+          "spans": [
+            {
+              "offset": 4332,
+              "length": 1239
+            }
+          ],
+          "polygon": [
+            1.786,
+            8.2298,
+            7.6892,
+            8.2374,
+            7.689,
+            10.1993,
+            1.7848,
+            10.1912
+          ],
+          "rows": 11,
+          "columns": 7,
+          "absorbed_tables": []
+        }
+      ],
+      "producer": "di-layout-heuristic-v1"
+    },
+    {
+      "segment_id": "f1-seg-003",
+      "file_id": "f1",
+      "first_page": 8,
+      "last_page": 9,
+      "content_type": "DRAWING",
+      "confidence": 0.887,
+      "page_confidences": [
+        0.89,
+        0.887
+      ],
+      "section_root": "Derating factors",
+      "regions": [
+        {
+          "kind": "TEXT",
+          "ref": "paragraphs[9]",
+          "page": 8,
+          "spans": [
+            {
+              "offset": 5713,
+              "length": 1
+            },
+            {
+              "offset": 5717,
+              "length": 22
+            },
+            {
+              "offset": 5742,
+              "length": 25
+            },
+            {
+              "offset": 5769,
+              "length": 9
+            },
+            {
+              "offset": 5780,
+              "length": 43
+            },
+            {
+              "offset": 5826,
+              "length": 13
+            },
+            {
+              "offset": 5841,
+              "length": 81
+            },
+            {
+              "offset": 5925,
+              "length": 7
+            },
+            {
+              "offset": 5935,
+              "length": 35
+            }
+          ],
+          "polygon": null,
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "SCHEDULE",
+          "ref": "table[3]",
+          "page": 8,
+          "spans": [
+            {
+              "offset": 5973,
+              "length": 293
+            }
+          ],
+          "polygon": [
+            4.8191,
+            2.9935,
+            7.6849,
+            3.0054,
+            7.6825,
+            3.7275,
+            4.8166,
+            3.715
+          ],
+          "rows": 4,
+          "columns": 3,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "DRAWING",
+          "ref": "figure[8.1]",
+          "page": 8,
+          "spans": [
+            {
+              "offset": 6269,
+              "length": 18
+            }
+          ],
+          "polygon": [
+            0.5609,
+            6.2162,
+            8.1919,
+            6.2188,
+            8.1919,
+            11.0716,
+            0.5608,
+            11.0686
+          ],
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "DRAWING",
+          "ref": "figure[9.1]",
+          "page": 9,
+          "spans": [
+            {
+              "offset": 6378,
+              "length": 38
+            }
+          ],
+          "polygon": [
+            0.2726,
+            0.9023,
+            7.6918,
+            0.9016,
+            7.6907,
+            5.0983,
+            0.2712,
+            5.0989
+          ],
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "TEXT",
+          "ref": "paragraphs[26]",
+          "page": 9,
+          "spans": [
+            {
+              "offset": 6419,
+              "length": 26
+            },
+            {
+              "offset": 6447,
+              "length": 128
+            },
+            {
+              "offset": 6578,
+              "length": 14
+            },
+            {
+              "offset": 6594,
+              "length": 120
+            },
+            {
+              "offset": 6717,
+              "length": 14
+            },
+            {
+              "offset": 6733,
+              "length": 69
+            },
+            {
+              "offset": 6805,
+              "length": 13
+            },
+            {
+              "offset": 6820,
+              "length": 69
+            },
+            {
+              "offset": 6891,
+              "length": 93
+            },
+            {
+              "offset": 6986,
+              "length": 122
+            },
+            {
+              "offset": 7111,
+              "length": 14
+            },
+            {
+              "offset": 7127,
+              "length": 112
+            },
+            {
+              "offset": 7242,
+              "length": 17
+            },
+            {
+              "offset": 7261,
+              "length": 180
+            },
+            {
+              "offset": 7444,
+              "length": 27
+            },
+            {
+              "offset": 7473,
+              "length": 26
+            },
+            {
+              "offset": 7501,
+              "length": 19
+            },
+            {
+              "offset": 7522,
+              "length": 27
+            },
+            {
+              "offset": 7551,
+              "length": 44
+            },
+            {
+              "offset": 7597,
+              "length": 27
+            },
+            {
+              "offset": 7626,
+              "length": 5
+            },
+            {
+              "offset": 7633,
+              "length": 5
+            },
+            {
+              "offset": 7640,
+              "length": 38
+            },
+            {
+              "offset": 7680,
+              "length": 13
+            },
+            {
+              "offset": 7695,
+              "length": 16
+            },
+            {
+              "offset": 7713,
+              "length": 39
+            }
+          ],
+          "polygon": null,
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        }
+      ],
+      "producer": "di-layout-heuristic-v1"
+    },
+    {
+      "segment_id": "f1-seg-004",
+      "file_id": "f1",
+      "first_page": 10,
+      "last_page": 12,
+      "content_type": "SCHEDULE",
+      "confidence": 0.528,
+      "page_confidences": [
+        0.537,
+        0.528,
+        0.533
+      ],
+      "section_root": "Technical data",
+      "regions": [
+        {
+          "kind": "TEXT",
+          "ref": "paragraphs[3]",
+          "page": 10,
+          "spans": [
+            {
+              "offset": 7895,
+              "length": 19
+            },
+            {
+              "offset": 10064,
+              "length": 2
+            },
+            {
+              "offset": 10068,
+              "length": 56
+            }
+          ],
+          "polygon": null,
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "SCHEDULE",
+          "ref": "table[4]",
+          "page": 10,
+          "spans": [
+            {
+              "offset": 7917,
+              "length": 2144
+            }
+          ],
+          "polygon": [
+            0.5741,
+            2.324,
+            7.6878,
+            2.3289,
+            7.688,
+            5.3062,
+            0.574,
+            5.2999
+          ],
+          "rows": 15,
+          "columns": 8,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "SCHEDULE",
+          "ref": "table[5]",
+          "page": 10,
+          "spans": [
+            {
+              "offset": 10127,
+              "length": 3322
+            }
+          ],
+          "polygon": [
+            0.5721,
+            6.3264,
+            7.672,
+            6.3265,
+            7.6734,
+            9.3206,
+            0.5732,
+            9.3194
+          ],
+          "rows": 15,
+          "columns": 14,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "TEXT",
+          "ref": "paragraphs[4]",
+          "page": 11,
+          "spans": [
+            {
+              "offset": 13536,
+              "length": 4
+            },
+            {
+              "offset": 13543,
+              "length": 17
+            },
+            {
+              "offset": 13563,
+              "length": 5
+            },
+            {
+              "offset": 15437,
+              "length": 5
+            }
+          ],
+          "polygon": null,
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "SCHEDULE",
+          "ref": "table[6]",
+          "page": 11,
+          "spans": [
+            {
+              "offset": 13571,
+              "length": 1863
+            }
+          ],
+          "polygon": [
+            0.5736,
+            2.3211,
+            7.6871,
+            2.3262,
+            7.6876,
+            5.3053,
+            0.5737,
+            5.2993
+          ],
+          "rows": 15,
+          "columns": 7,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "SCHEDULE",
+          "ref": "table[7]",
+          "page": 11,
+          "spans": [
+            {
+              "offset": 15445,
+              "length": 3070
+            }
+          ],
+          "polygon": [
+            0.5691,
+            6.3257,
+            7.6839,
+            6.3263,
+            7.6853,
+            9.3029,
+            0.5702,
+            9.3013
+          ],
+          "rows": 15,
+          "columns": 13,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "TEXT",
+          "ref": "paragraphs[4]",
+          "page": 12,
+          "spans": [
+            {
+              "offset": 18659,
+              "length": 4
+            },
+            {
+              "offset": 18666,
+              "length": 17
+            },
+            {
+              "offset": 18685,
+              "length": 1
+            },
+            {
+              "offset": 20553,
+              "length": 1
+            }
+          ],
+          "polygon": null,
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "SCHEDULE",
+          "ref": "table[8]",
+          "page": 12,
+          "spans": [
+            {
+              "offset": 18689,
+              "length": 1861
+            }
+          ],
+          "polygon": [
+            0.5716,
+            2.3206,
+            7.6884,
+            2.322,
+            7.6896,
+            5.3057,
+            0.5726,
+            5.3035
+          ],
+          "rows": 15,
+          "columns": 7,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "SCHEDULE",
+          "ref": "table[9]",
+          "page": 12,
+          "spans": [
+            {
+              "offset": 20557,
+              "length": 3066
+            }
+          ],
+          "polygon": [
+            0.5716,
+            6.6427,
+            7.6928,
+            6.6428,
+            7.6941,
+            9.6298,
+            0.5727,
+            9.6283
+          ],
+          "rows": 15,
+          "columns": 13,
+          "absorbed_tables": []
+        }
+      ],
+      "producer": "di-layout-heuristic-v1"
+    },
+    {
+      "segment_id": "f1-seg-005",
+      "file_id": "f1",
+      "first_page": 13,
+      "last_page": 14,
+      "content_type": "DRAWING",
+      "confidence": 0.613,
+      "page_confidences": [
+        0.613,
+        0.924
+      ],
+      "section_root": "Technical data",
+      "regions": [
+        {
+          "kind": "TEXT",
+          "ref": "paragraphs[12]",
+          "page": 13,
+          "spans": [
+            {
+              "offset": 23673,
+              "length": 4
+            },
+            {
+              "offset": 23680,
+              "length": 28
+            },
+            {
+              "offset": 23995,
+              "length": 3
+            },
+            {
+              "offset": 24001,
+              "length": 6
+            },
+            {
+              "offset": 24010,
+              "length": 18
+            },
+            {
+              "offset": 24906,
+              "length": 26
+            },
+            {
+              "offset": 25260,
+              "length": 30
+            },
+            {
+              "offset": 25573,
+              "length": 29
+            },
+            {
+              "offset": 26648,
+              "length": 5
+            },
+            {
+              "offset": 26656,
+              "length": 17
+            },
+            {
+              "offset": 27455,
+              "length": 26
+            },
+            {
+              "offset": 27809,
+              "length": 29
+            }
+          ],
+          "polygon": null,
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "DRAWING",
+          "ref": "figure[13.1]",
+          "page": 13,
+          "spans": [
+            {
+              "offset": 23711,
+              "length": 281
+            }
+          ],
+          "polygon": [
+            0.9618,
+            1.5899,
+            3.8827,
+            1.5909,
+            3.8836,
+            5.8214,
+            0.9624,
+            5.8207
+          ],
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "SCHEDULE",
+          "ref": "table[10]",
+          "page": 13,
+          "spans": [
+            {
+              "offset": 24031,
+              "length": 872
+            }
+          ],
+          "polygon": [
+            0.5722,
+            6.4191,
+            4.0321,
+            6.4203,
+            4.0317,
+            7.7764,
+            0.5718,
+            7.7746
+          ],
+          "rows": 8,
+          "columns": 7,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "SCHEDULE",
+          "ref": "table[11]",
+          "page": 13,
+          "spans": [
+            {
+              "offset": 24935,
+              "length": 322
+            }
+          ],
+          "polygon": [
+            0.5784,
+            8.1153,
+            4.0411,
+            8.1164,
+            4.0409,
+            8.6391,
+            0.5779,
+            8.6375
+          ],
+          "rows": 3,
+          "columns": 7,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "SCHEDULE",
+          "ref": "table[12]",
+          "page": 13,
+          "spans": [
+            {
+              "offset": 25293,
+              "length": 277
+            }
+          ],
+          "polygon": [
+            0.5752,
+            8.9878,
+            4.0454,
+            8.9889,
+            4.0453,
+            9.5087,
+            0.5746,
+            9.5071
+          ],
+          "rows": 3,
+          "columns": 6,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "SCHEDULE",
+          "ref": "table[13]",
+          "page": 13,
+          "spans": [
+            {
+              "offset": 25605,
+              "length": 719
+            }
+          ],
+          "polygon": [
+            0.5749,
+            9.8436,
+            4.0364,
+            9.8411,
+            4.0384,
+            11.1995,
+            0.5766,
+            11.2015
+          ],
+          "rows": 8,
+          "columns": 4,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "DRAWING",
+          "ref": "figure[13.2]",
+          "page": 13,
+          "spans": [
+            {
+              "offset": 26327,
+              "length": 318
+            }
+          ],
+          "polygon": [
+            4.0076,
+            1.5958,
+            6.8163,
+            1.5974,
+            6.8173,
+            5.8246,
+            4.0084,
+            5.8234
+          ],
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "SCHEDULE",
+          "ref": "table[14]",
+          "page": 13,
+          "spans": [
+            {
+              "offset": 26676,
+              "length": 776
+            }
+          ],
+          "polygon": [
+            4.2118,
+            6.4006,
+            7.6822,
+            6.4022,
+            7.6818,
+            7.7708,
+            4.2115,
+            7.7687
+          ],
+          "rows": 8,
+          "columns": 6,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "SCHEDULE",
+          "ref": "table[15]",
+          "page": 13,
+          "spans": [
+            {
+              "offset": 27484,
+              "length": 322
+            }
+          ],
+          "polygon": [
+            4.2209,
+            8.1171,
+            7.6796,
+            8.1185,
+            7.6797,
+            8.6364,
+            4.2206,
+            8.6343
+          ],
+          "rows": 3,
+          "columns": 7,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "SCHEDULE",
+          "ref": "table[16]",
+          "page": 13,
+          "spans": [
+            {
+              "offset": 27841,
+              "length": 716
+            }
+          ],
+          "polygon": [
+            4.2202,
+            8.9774,
+            7.6841,
+            8.9765,
+            7.6853,
+            10.3309,
+            4.2213,
+            10.3309
+          ],
+          "rows": 8,
+          "columns": 4,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "TEXT",
+          "ref": "paragraphs[2]",
+          "page": 14,
+          "spans": [
+            {
+              "offset": 28701,
+              "length": 4
+            },
+            {
+              "offset": 28708,
+              "length": 28
+            }
+          ],
+          "polygon": null,
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "DRAWING",
+          "ref": "figure[14.1]",
+          "page": 14,
+          "spans": [
+            {
+              "offset": 28739,
+              "length": 559
+            }
+          ],
+          "polygon": [
+            1.0734,
+            1.93,
+            7.1917,
+            1.9292,
+            7.1939,
+            6.1557,
+            1.0749,
+            6.1569
+          ],
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        }
+      ],
+      "producer": "di-layout-heuristic-v1"
+    },
+    {
+      "segment_id": "f1-seg-006",
+      "file_id": "f1",
+      "first_page": 15,
+      "last_page": 15,
+      "content_type": "SCHEDULE",
+      "confidence": 0.401,
+      "page_confidences": [
+        0.401
+      ],
+      "section_root": "Outline drawing NMG 0450",
+      "regions": [
+        {
+          "kind": "TEXT",
+          "ref": "paragraphs[7]",
+          "page": 15,
+          "spans": [
+            {
+              "offset": 29386,
+              "length": 6
+            },
+            {
+              "offset": 29395,
+              "length": 18
+            },
+            {
+              "offset": 30373,
+              "length": 29
+            },
+            {
+              "offset": 30685,
+              "length": 29
+            },
+            {
+              "offset": 31259,
+              "length": 6
+            },
+            {
+              "offset": 31268,
+              "length": 18
+            },
+            {
+              "offset": 32178,
+              "length": 29
+            }
+          ],
+          "polygon": null,
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "SCHEDULE",
+          "ref": "table[17]",
+          "page": 15,
+          "spans": [
+            {
+              "offset": 29416,
+              "length": 573
+            }
+          ],
+          "polygon": [
+            0.5714,
+            2.1093,
+            4.0455,
+            2.1126,
+            4.0441,
+            3.1763,
+            0.57,
+            3.1732
+          ],
+          "rows": 6,
+          "columns": 6,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "SCHEDULE",
+          "ref": "table[18]",
+          "page": 15,
+          "spans": [
+            {
+              "offset": 29992,
+              "length": 378
+            }
+          ],
+          "polygon": [
+            0.5708,
+            3.3473,
+            4.0445,
+            3.3481,
+            4.0442,
+            4.0345,
+            0.5706,
+            4.0335
+          ],
+          "rows": 4,
+          "columns": 7,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "SCHEDULE",
+          "ref": "table[19]",
+          "page": 15,
+          "spans": [
+            {
+              "offset": 30405,
+              "length": 277
+            }
+          ],
+          "polygon": [
+            0.5733,
+            4.3763,
+            4.0475,
+            4.3766,
+            4.048,
+            4.9086,
+            0.5734,
+            4.908
+          ],
+          "rows": 3,
+          "columns": 6,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "SCHEDULE",
+          "ref": "table[20]",
+          "page": 15,
+          "spans": [
+            {
+              "offset": 30717,
+              "length": 539
+            }
+          ],
+          "polygon": [
+            0.571,
+            5.2407,
+            4.0378,
+            5.2386,
+            4.0404,
+            6.2462,
+            0.5731,
+            6.2474
+          ],
+          "rows": 6,
+          "columns": 4,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "SCHEDULE",
+          "ref": "table[21]",
+          "page": 15,
+          "spans": [
+            {
+              "offset": 31289,
+              "length": 505
+            }
+          ],
+          "polygon": [
+            4.2165,
+            2.1016,
+            7.6831,
+            2.1064,
+            7.6814,
+            3.1714,
+            4.2148,
+            3.1668
+          ],
+          "rows": 6,
+          "columns": 5,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "SCHEDULE",
+          "ref": "table[22]",
+          "page": 15,
+          "spans": [
+            {
+              "offset": 31797,
+              "length": 378
+            }
+          ],
+          "polygon": [
+            4.2169,
+            3.3403,
+            7.6782,
+            3.3411,
+            7.6783,
+            4.0336,
+            4.217,
+            4.0326
+          ],
+          "rows": 4,
+          "columns": 7,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "SCHEDULE",
+          "ref": "table[23]",
+          "page": 15,
+          "spans": [
+            {
+              "offset": 32210,
+              "length": 539
+            }
+          ],
+          "polygon": [
+            4.2184,
+            4.3671,
+            7.675,
+            4.3658,
+            7.6764,
+            5.377,
+            4.2195,
+            5.3775
+          ],
+          "rows": 6,
+          "columns": 4,
+          "absorbed_tables": []
+        }
+      ],
+      "producer": "di-layout-heuristic-v1"
+    },
+    {
+      "segment_id": "f1-seg-007",
+      "file_id": "f1",
+      "first_page": 16,
+      "last_page": 20,
+      "content_type": "DRAWING",
+      "confidence": 0.394,
+      "page_confidences": [
+        0.923,
+        0.922,
+        0.889,
+        0.394,
+        0.705
+      ],
+      "section_root": "Transportation parameters",
+      "regions": [
+        {
+          "kind": "TEXT",
+          "ref": "paragraphs[5]",
+          "page": 16,
+          "spans": [
+            {
+              "offset": 32893,
+              "length": 4
+            },
+            {
+              "offset": 32900,
+              "length": 31
+            },
+            {
+              "offset": 33354,
+              "length": 5
+            },
+            {
+              "offset": 33362,
+              "length": 19
+            },
+            {
+              "offset": 33750,
+              "length": 31
+            }
+          ],
+          "polygon": null,
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "DRAWING",
+          "ref": "figure[16.1]",
+          "page": 16,
+          "spans": [
+            {
+              "offset": 32934,
+              "length": 417
+            }
+          ],
+          "polygon": [
+            0.6295,
+            1.9338,
+            7.6551,
+            1.9334,
+            7.6584,
+            6.383,
+            0.6326,
+            6.3828
+          ],
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "SCHEDULE",
+          "ref": "table[24]",
+          "page": 16,
+          "spans": [
+            {
+              "offset": 33384,
+              "length": 363
+            }
+          ],
+          "polygon": [
+            4.2178,
+            7.2968,
+            7.6811,
+            7.298,
+            7.6811,
+            8.0274,
+            4.2184,
+            8.0264
+          ],
+          "rows": 4,
+          "columns": 6,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "SCHEDULE",
+          "ref": "table[25]",
+          "page": 16,
+          "spans": [
+            {
+              "offset": 33784,
+              "length": 356
+            }
+          ],
+          "polygon": [
+            4.2183,
+            8.3334,
+            7.6767,
+            8.3343,
+            7.6771,
+            9.0231,
+            4.2185,
+            9.0218
+          ],
+          "rows": 4,
+          "columns": 4,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "TEXT",
+          "ref": "paragraphs[4]",
+          "page": 17,
+          "spans": [
+            {
+              "offset": 34228,
+              "length": 4
+            },
+            {
+              "offset": 34235,
+              "length": 31
+            },
+            {
+              "offset": 34565,
+              "length": 5
+            },
+            {
+              "offset": 34573,
+              "length": 18
+            }
+          ],
+          "polygon": null,
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "DRAWING",
+          "ref": "figure[17.1]",
+          "page": 17,
+          "spans": [
+            {
+              "offset": 34269,
+              "length": 293
+            }
+          ],
+          "polygon": [
+            0.9031,
+            1.9255,
+            7.1845,
+            1.9251,
+            7.1838,
+            6.4003,
+            0.9018,
+            6.4006
+          ],
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "SCHEDULE",
+          "ref": "table[26]",
+          "page": 17,
+          "spans": [
+            {
+              "offset": 34594,
+              "length": 351
+            }
+          ],
+          "polygon": [
+            4.2223,
+            7.4721,
+            7.6787,
+            7.4716,
+            7.6801,
+            8.0269,
+            4.2236,
+            8.0269
+          ],
+          "rows": 3,
+          "columns": 6,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "SCHEDULE",
+          "ref": "table[27]",
+          "page": 17,
+          "spans": [
+            {
+              "offset": 34948,
+              "length": 414
+            }
+          ],
+          "polygon": [
+            4.2176,
+            8.3395,
+            7.6734,
+            8.3408,
+            7.6734,
+            9.0368,
+            4.2175,
+            9.0345
+          ],
+          "rows": 5,
+          "columns": 4,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "TEXT",
+          "ref": "paragraphs[30]",
+          "page": 18,
+          "spans": [
+            {
+              "offset": 35506,
+              "length": 4
+            },
+            {
+              "offset": 35513,
+              "length": 77
+            },
+            {
+              "offset": 35614,
+              "length": 14
+            },
+            {
+              "offset": 35630,
+              "length": 20
+            },
+            {
+              "offset": 35652,
+              "length": 47
+            },
+            {
+              "offset": 35701,
+              "length": 15
+            },
+            {
+              "offset": 35718,
+              "length": 34
+            },
+            {
+              "offset": 35754,
+              "length": 30
+            },
+            {
+              "offset": 35786,
+              "length": 34
+            },
+            {
+              "offset": 35822,
+              "length": 25
+            },
+            {
+              "offset": 35849,
+              "length": 31
+            },
+            {
+              "offset": 35882,
+              "length": 17
+            },
+            {
+              "offset": 35902,
+              "length": 15
+            },
+            {
+              "offset": 35919,
+              "length": 20
+            },
+            {
+              "offset": 35941,
+              "length": 47
+            },
+            {
+              "offset": 35990,
+              "length": 15
+            },
+            {
+              "offset": 36007,
+              "length": 34
+            },
+            {
+              "offset": 36043,
+              "length": 34
+            },
+            {
+              "offset": 36079,
+              "length": 25
+            },
+            {
+              "offset": 36106,
+              "length": 13
+            },
+            {
+              "offset": 36121,
+              "length": 17
+            },
+            {
+              "offset": 36141,
+              "length": 14
+            },
+            {
+              "offset": 36157,
+              "length": 30
+            },
+            {
+              "offset": 36189,
+              "length": 51
+            },
+            {
+              "offset": 36242,
+              "length": 51
+            },
+            {
+              "offset": 36295,
+              "length": 36
+            },
+            {
+              "offset": 36333,
+              "length": 40
+            },
+            {
+              "offset": 36375,
+              "length": 38
+            },
+            {
+              "offset": 36416,
+              "length": 26
+            },
+            {
+              "offset": 36445,
+              "length": 24
+            }
+          ],
+          "polygon": null,
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "DRAWING",
+          "ref": "figure[18.1]",
+          "page": 18,
+          "spans": [
+            {
+              "offset": 35593,
+              "length": 18
+            }
+          ],
+          "polygon": [
+            0.5646,
+            1.8219,
+            7.6932,
+            1.8224,
+            7.6927,
+            6.2551,
+            0.5641,
+            6.2547
+          ],
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "TEXT",
+          "ref": "paragraphs[3]",
+          "page": 19,
+          "spans": [
+            {
+              "offset": 36491,
+              "length": 22
+            },
+            {
+              "offset": 36515,
+              "length": 301
+            },
+            {
+              "offset": 36818,
+              "length": 258
+            }
+          ],
+          "polygon": null,
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        },
+        {
+          "kind": "TEXT",
+          "ref": "paragraphs[2]",
+          "page": 20,
+          "spans": [
+            {
+              "offset": 37099,
+              "length": 5
+            },
+            {
+              "offset": 37106,
+              "length": 74
+            }
+          ],
+          "polygon": null,
+          "rows": null,
+          "columns": null,
+          "absorbed_tables": []
+        }
+      ],
+      "producer": "di-layout-heuristic-v1"
+    }
+  ],
+  "section_index": [
+    {
+      "offset": 83,
+      "heading": "Low voltage generators for engines Industrial application series",
+      "page": 1,
+      "level": 1
+    },
+    {
+      "offset": 1297,
+      "heading": "General information",
+      "page": 4,
+      "level": 1
+    },
+    {
+      "offset": 1939,
+      "heading": "Electrical features",
+      "page": 6,
+      "level": 1
+    },
+    {
+      "offset": 2390,
+      "heading": "Voltage regulator",
+      "page": 6,
+      "level": 1
+    },
+    {
+      "offset": 2665,
+      "heading": "Overload capability",
+      "page": 6,
+      "level": 1
+    },
+    {
+      "offset": 2754,
+      "heading": "Excitation systems",
+      "page": 6,
+      "level": 1
+    },
+    {
+      "offset": 3354,
+      "heading": "Frequency",
+      "page": 7,
+      "level": 1
+    },
+    {
+      "offset": 3425,
+      "heading": "Voltage and connections",
+      "page": 7,
+      "level": 1
+    },
+    {
+      "offset": 3607,
+      "heading": "Insulation",
+      "page": 7,
+      "level": 1
+    },
+    {
+      "offset": 3851,
+      "heading": "Voltage waveform",
+      "page": 7,
+      "level": 1
+    },
+    {
+      "offset": 4025,
+      "heading": "Derating",
+      "page": 7,
+      "level": 1
+    },
+    {
+      "offset": 4307,
+      "heading": "Derating factors",
+      "page": 7,
+      "level": 1
+    },
+    {
+      "offset": 5717,
+      "heading": "Mechanical features",
+      "page": 8,
+      "level": 1
+    },
+    {
+      "offset": 5742,
+      "heading": "Poles and frame sizes",
+      "page": 8,
+      "level": 1
+    },
+    {
+      "offset": 5826,
+      "heading": "Bearings",
+      "page": 8,
+      "level": 1
+    },
+    {
+      "offset": 5935,
+      "heading": "Standard bearing configurations",
+      "page": 8,
+      "level": 1
+    },
+    {
+      "offset": 6419,
+      "heading": "Direction of rotation",
+      "page": 9,
+      "level": 1
+    },
+    {
+      "offset": 6578,
+      "heading": "Enclosure",
+      "page": 9,
+      "level": 1
+    },
+    {
+      "offset": 6717,
+      "heading": "Overspeed",
+      "page": 9,
+      "level": 1
+    },
+    {
+      "offset": 6805,
+      "heading": "Mounting",
+      "page": 9,
+      "level": 1
+    },
+    {
+      "offset": 7111,
+      "heading": "Balancing",
+      "page": 9,
+      "level": 1
+    },
+    {
+      "offset": 7242,
+      "heading": "Terminal box",
+      "page": 9,
+      "level": 1
+    },
+    {
+      "offset": 7444,
+      "heading": "Main optional features",
+      "page": 9,
+      "level": 1
+    },
+    {
+      "offset": 7895,
+      "heading": "Technical data",
+      "page": 10,
+      "level": 1
+    },
+    {
+      "offset": 13543,
+      "heading": "Technical data",
+      "page": 11,
+      "level": 1
+    },
+    {
+      "offset": 18666,
+      "heading": "Technical data",
+      "page": 12,
+      "level": 1
+    },
+    {
+      "offset": 23680,
+      "heading": "Outline drawing NMG 0400",
+      "page": 13,
+      "level": 1
+    },
+    {
+      "offset": 24010,
+      "heading": "Single bearing",
+      "page": 13,
+      "level": 1
+    },
+    {
+      "offset": 24906,
+      "heading": "Flange dimensions (mm)",
+      "page": 13,
+      "level": 1
+    },
+    {
+      "offset": 25260,
+      "heading": "Flex disc dimensions (mm)",
+      "page": 13,
+      "level": 1
+    },
+    {
+      "offset": 25573,
+      "heading": "Transportation parameters",
+      "page": 13,
+      "level": 1
+    },
+    {
+      "offset": 26656,
+      "heading": "Double bearing",
+      "page": 13,
+      "level": 1
+    },
+    {
+      "offset": 27455,
+      "heading": "Flange dimensions (mm)",
+      "page": 13,
+      "level": 1
+    },
+    {
+      "offset": 27809,
+      "heading": "Transportation parameters",
+      "page": 13,
+      "level": 1
+    },
+    {
+      "offset": 28708,
+      "heading": "Outline drawing NMG 0450",
+      "page": 14,
+      "level": 1
+    },
+    {
+      "offset": 29395,
+      "heading": "Single bearing",
+      "page": 15,
+      "level": 1
+    },
+    {
+      "offset": 30373,
+      "heading": "Flex disc dimensions (mm)",
+      "page": 15,
+      "level": 1
+    },
+    {
+      "offset": 30685,
+      "heading": "Transportation parameters",
+      "page": 15,
+      "level": 1
+    },
+    {
+      "offset": 31268,
+      "heading": "Double bearing",
+      "page": 15,
+      "level": 1
+    },
+    {
+      "offset": 32178,
+      "heading": "Transportation parameters",
+      "page": 15,
+      "level": 1
+    },
+    {
+      "offset": 32900,
+      "heading": "Outline drawing NMG 0500 A-B",
+      "page": 16,
+      "level": 1
+    },
+    {
+      "offset": 33362,
+      "heading": "Double bearing",
+      "page": 16,
+      "level": 1
+    },
+    {
+      "offset": 33750,
+      "heading": "Transportation parameters",
+      "page": 16,
+      "level": 1
+    },
+    {
+      "offset": 34235,
+      "heading": "Outline drawing NMG 0500 C-D",
+      "page": 17,
+      "level": 1
+    },
+    {
+      "offset": 34573,
+      "heading": "Double bearing",
+      "page": 17,
+      "level": 1
+    },
+    {
+      "offset": 35513,
+      "heading": "Total offer of motors and generators with a complete portfolio of services",
+      "page": 18,
+      "level": 1
+    },
+    {
+      "offset": 35614,
+      "heading": "IEC motors",
+      "page": 18,
+      "level": 1
+    },
+    {
+      "offset": 35902,
+      "heading": "NEMA motors",
+      "page": 18,
+      "level": 1
+    },
+    {
+      "offset": 36141,
+      "heading": "Generators",
+      "page": 18,
+      "level": 1
+    },
+    {
+      "offset": 36416,
+      "heading": "Synchronous condensers",
+      "page": 18,
+      "level": 1
+    },
+    {
+      "offset": 36445,
+      "heading": "Life cycle services",
+      "page": 18,
+      "level": 1
+    },
+    {
+      "offset": 37099,
+      "heading": "ABB",
+      "page": 20,
+      "level": 1
+    }
+  ],
+  "coverage": {
+    "f1": {
+      "total_chars": 37351,
+      "covered_chars": 34600,
+      "furniture_chars": 2751,
+      "unexplained_chars": 0,
+      "unexplained_samples": []
+    }
+  },
+  "producer": "di-layout"
+}
