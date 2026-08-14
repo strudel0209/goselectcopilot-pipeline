@@ -40,6 +40,7 @@ from .extractors import Extractor, SegmentContext
 from .manifest import build_manifest, work_items
 from .producers.base import DocumentAnalysis, SegmentProducer
 from .reconcile import TagLexicon, harvest
+from .render import render_pages
 from .spans import text_for
 from .validate import validate_payload
 
@@ -52,6 +53,10 @@ class PipelineConfig:
     max_workers: int = 4
     max_attempts: int = 3
     require_grounding: bool = True
+    # Measured on Plainville sheet 1 (E-size): 100 dpi reads VFD-401 and RWP-401
+    # correctly in 24 tiles; 150 dpi reads the same tags but needs 48, over the
+    # 40-tile cost guard. DI's own crop of that sheet is 1477x934 and reads VD-401.
+    drawing_dpi: int = 100
     cache_dir: Path = Path(".cache")
     output_dir: Path = Path("out")
 
@@ -65,6 +70,7 @@ class Pipeline:
     config: PipelineConfig = field(default_factory=PipelineConfig)
 
     _analyses: dict[str, DocumentAnalysis] = field(default_factory=dict, init=False)
+    _sources: dict[str, bytes] = field(default_factory=dict, init=False)
 
     # -- Segmentation_State -------------------------------------------------
 
@@ -75,6 +81,7 @@ class Pipeline:
             analysis = self.producer.analyze(file_id, data, source_uri)
             analysis.source_uri = source_uri
             self._analyses[file_id] = analysis
+            self._sources[file_id] = data
             analyses.append(analysis)
             for warning in analysis.warnings:
                 log.warning("%s [%s]: %s", file_id, analysis.producer, warning)
@@ -98,15 +105,18 @@ class Pipeline:
     # -- Cross-segment prerequisites ---------------------------------------
 
     def build_lexicon(self, manifest: Manifest) -> TagLexicon:
-        """Harvest authoritative tags from SCHEDULE segments before extraction.
+        """Harvest authoritative tags from the whole package before extraction.
+
+        Schedules are the cleanest source, but a drawings-only package has none -
+        and on the Plainville sheet the layout model still reads 122 correct tags
+        that the vision pass can be snapped back to. Restricting the harvest to
+        SCHEDULE segments left that package with an empty lexicon and no repair.
 
         This is only possible because the package is one job. It is the reason
         drawing tag repair works at all.
         """
         texts: list[str] = []
         for segment in manifest.segments:
-            if segment.content_type is not ContentType.SCHEDULE:
-                continue
             content = self._analyses[segment.file_id].content
             texts.append(
                 text_for(content, [s.as_tuple() for r in segment.regions for s in r.spans])
@@ -122,10 +132,20 @@ class Pipeline:
 
         analysis = self._analyses[item.file_id]
         figures = {}
-        for figure_id in item.figures:
-            blob = self.producer.figure_image(analysis, figure_id)
-            if blob:
-                figures[figure_id] = blob
+        if item.content_type is ContentType.DRAWING:
+            # Render from the source PDF rather than taking the service's crop:
+            # DI's crops arrive pre-downsampled and CU returns no image at all.
+            figures = render_pages(
+                self._sources.get(item.file_id, b""),
+                item.first_page,
+                item.last_page,
+                dpi=self.config.drawing_dpi,
+            )
+        if not figures:
+            for figure_id in item.figures:
+                blob = self.producer.figure_image(analysis, figure_id)
+                if blob:
+                    figures[figure_id] = blob
 
         context = SegmentContext(
             content=analysis.content,

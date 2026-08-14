@@ -57,7 +57,7 @@ instructs you to reconcile across files.
 
 ## 2. What the pipeline does
 
-Eight stages, ~4,200 lines across 16 modules.
+Nine stages, ~4,300 lines across 23 modules.
 
 | Stage | Input | Output | Module |
 |---|---|---|---|
@@ -67,6 +67,7 @@ Eight stages, ~4,200 lines across 16 modules.
 | Split inside pages | Table and figure geometry | Regions, by span subtraction | `regions.py` |
 | Index sections | DI's section tree | Heading → character offset, with document boundaries | `sections.py` |
 | Prove coverage | All spans | Assert every character is accounted for | `manifest.py` |
+| **Render drawings** | **Source PDF, chosen DPI** | **Page images the service never downsampled** | **`render.py`** |
 | Extract | One segment | Structured fields, per-type schema and model | `extractors.py` |
 | Merge | All segment results | One payload, ordered, deduped, conflicts surfaced | `assemble.py` |
 
@@ -87,13 +88,14 @@ flowchart TD
     CLS["segmentation.py<br/>profile pages, classify, build segments"]
     REG["regions.py<br/>intra-page split by span subtraction<br/>claim order and containment"]
     MAN["manifest.py build_manifest<br/>coverage proof:<br/>claimed + furniture + unexplained = total"]
-    LEX["reconcile.py harvest<br/>tag lexicon from SCHEDULE segments"]
+    LEX["reconcile.py harvest<br/>tag lexicon from the whole package"]
     WI["manifest.py work_items<br/>one WorkItem per segment, a pointer not a payload"]
     KIND{"content type?"}
     TX["extractors.py TEXT_SCHEMA<br/>no paired_with field"]
     SC["extractors.py SCHEDULE_SCHEMA"]
-    TILE["tiling.py tile_image<br/>native-resolution tiles"]
-    DR["extractors.py DRAWING_SCHEMA<br/>tags and topology only"]
+    RND["render.py render_pages<br/>rasterise the source PDF at 100 dpi<br/>not the service crop"]
+    TILE["tiling.py tile_image<br/>native-resolution tiles, 24 per E-size sheet"]
+    DR["extractors.py DRAWING_SCHEMA<br/>tags and topology only<br/>batched, 50 images per request max"]
     MODEL["models.py AzureOpenAIModel<br/>strict json_schema, Entra auth, retry"]
     EXP["extractors.expand<br/>flat to domain, parse_quantity in Python"]
     VAL{"every value grounded?"}
@@ -118,6 +120,7 @@ flowchart TD
         KIND
         TX
         SC
+        RND
         TILE
         DR
         MODEL
@@ -146,7 +149,8 @@ flowchart TD
     WI --> KIND
     KIND -->|TEXT| TX
     KIND -->|SCHEDULE| SC
-    KIND -->|DRAWING| TILE
+    KIND -->|DRAWING| RND
+    RND --> TILE
     TILE --> DR
     TX --> MODEL
     SC --> MODEL
@@ -277,6 +281,13 @@ because the engine only decides how pages are split, not what is extracted.
 | Native-resolution CAD reading | Every vision path downscales to a token budget |
 | Cross-region precedence | "A schedule outranks a drawing for a kW rating" is ABB policy |
 
+**Content Understanding cannot read engineering drawings.** `enableFigureAnalysis`
+supports `Bar`, `Line`, `Pie`, `Radar`, `Scatter`, `Bubble`, `Quadrant`, `Mixed`,
+`Flow chart`, `Sequence` and `Gantt` — all business charts. A one-line diagram is
+none of them. CU also returns figure *descriptions* and chart.js or mermaid, with
+**no image bytes and no retrieval endpoint**, unlike Document Intelligence. So the
+drawing image has to be produced locally whichever engine does the routing.
+
 ### Alternatives considered
 
 - **Mistral OCR 4** returns bounding boxes, block classification and per-word
@@ -325,7 +336,44 @@ appears nowhere on the drawing. Tiling supplied the last character: whole-image
 gave `VFD-H4`, tiled gave `VFD-J4` — the difference between quoting a 124 A drive
 and a 65 A one.
 
+### Drawings: the bottleneck is pixels, not the model
+
+On the Plainville package, Content Understanding returned `VD-401` paired with
+`RWP-A01`. The truth is `VFD-401` feeding `RWP-401` — a dropped glyph and a `4→A`
+substitution, both signatures of text below legibility.
+
+Three causes, none of them the model:
+
+| Cause | Detail |
+|---|---|
+| The model saw no image | `ContentUnderstandingProducer.figure_image()` returns `None`. The drawing branch was reading OCR text only |
+| The lexicon was empty | Harvest was `SCHEDULE`-only; a drawings-only package has none. The layout model reads **122 correct tags** on that same sheet |
+| The crop was already downsampled | DI's server-side crop is **1477×934**. The sheet at 100 dpi is **3600×2400** |
+
+Walking the resolution ladder on sheet 1, with the package-wide lexicon applied:
+
+```
+source                       tiles   vis-tokens   VFD-401 / RWP-401
+DI figure crop 1477x934        —          —       VD-401 / RWP-A01   WRONG
+rendered  100 dpi 3600x2400    24        ~18k     VFD-401 / RWP-401  correct
+rendered  150 dpi 5400x3600    48        ~37k     VFD-401 / RWP-401  correct
+```
+
+**100 dpi is the default**: same tags as 150, half the tokens, and it fits under
+the 40-tile cost guard where 150 does not. The full four-sheet package then
+returns **14 pairs, status DONE, nothing needing review**, with a self-consistent
+numbering scheme — `VFD-101↔WP-101`, `VFD-711↔BWP-711`, `VFD-821↔RCP-821` — which
+is itself a signal, because a misread breaks the pattern.
+
 ### Service limits that shape the design
+
+**Images per request: 50.** A four-sheet drawing segment at 100 dpi produces 51
+tiles and the whole segment fails with `HTTP 400`. Tiles are batched across
+requests and merged; overlap duplicates were already handled by the pair dedupe.
+
+**Tile cap raises, it does not truncate.** Exceeding `max_tiles` throws rather
+than silently dropping tiles, so a cost overrun is visible instead of becoming
+quiet content loss.
 
 **Vision.** Azure OpenAI with `detail="high"` fits the image into 2048×2048, then
 if the shortest side still exceeds 768 px scales again so that it is 768. On an
@@ -484,11 +532,13 @@ pipeline.
 2. **Pairs counted in both directions.** `SSS-W5 ↔ WELL NO.5` and
    `WELL NO.5 ↔ SSS-W5` are the same relationship.
 3. **Junk pairs** from generic diagram labels — `VFD ↔ MOTOR`.
-4. **DI figure crops come back at ~1480×990**, not native resolution, so tiling
-   cannot recover detail the crop already lost. Local rasterising at high DPI is
-   needed for genuinely small text.
+4. **DI figure crops arrive at ~1480×990**, well below the resolution a tag needs.
+   Fixed by rasterising the source PDF locally, but it means drawing extraction
+   depends on `pymupdf` rather than on the service alone.
 5. **The SCHEDULE branch is untested.** No document in the corpus has a real
    equipment schedule.
+6. **Cost on drawing-heavy packages.** The four-sheet Plainville package took
+   146 s and roughly 72k visual tokens. Bound this before scaling.
 
 ---
 
@@ -496,7 +546,9 @@ pipeline.
 
 **Proven on real customer data:** span subtraction, 100% coverage,
 order-independent reassembly, section breadcrumbs on a scanned document (18/18
-headings), cross-file tag recovery, the vision budget, conflict surfacing.
+headings), cross-file tag recovery, the vision budget, conflict surfacing, and
+tag-level accuracy on a four-sheet E-size drawing package once rendered at 100 dpi
+(14 pairs, no corrupt tags).
 
 **Not proven:** pair precision, schedule extraction, anything on a package ABB has
 not supplied. **Every number in this document comes from four documents.

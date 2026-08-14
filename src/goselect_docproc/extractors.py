@@ -38,6 +38,10 @@ from .tiling import Tile, VisionLimits, tile_image
 
 log = logging.getLogger(__name__)
 
+# Azure OpenAI rejects a request carrying more than this many images. A four-sheet
+# drawing segment at 100 dpi produces 51 tiles, so batching is not optional.
+MAX_IMAGES_PER_REQUEST = 50
+
 
 @dataclass
 class SegmentContext:
@@ -312,15 +316,28 @@ class ModelExtractor:
         prompt = PROMPTS[self.content_type]
         if context.item.section_root:
             prompt += f"\nThis content sits under section: {context.item.section_root}\n"
+        prompt = f"{prompt}\n---\n{context.text}"
 
-        response = self.model.complete_json(
-            prompt=f"{prompt}\n---\n{context.text}",
-            schema=self.schema,
-            images=images or None,
-        )
-        payload = expand(response.get("items", []), context, self.content_type)
+        batches: list[list[bytes] | None] = [None]
+        if images:
+            batches = [
+                images[i : i + MAX_IMAGES_PER_REQUEST]
+                for i in range(0, len(images), MAX_IMAGES_PER_REQUEST)
+            ]
+            if len(batches) > 1:
+                notes.append(
+                    f"{len(images)} tiles sent in {len(batches)} requests; the service "
+                    f"caps one request at {MAX_IMAGES_PER_REQUEST} images"
+                )
+
+        items: list[dict[str, Any]] = []
+        for batch in batches:
+            response = self.model.complete_json(prompt=prompt, schema=self.schema, images=batch)
+            items.extend(response.get("items", []))
+            notes.extend(response.get("notes", []))
+
+        payload = expand(items, context, self.content_type)
         payload.notes.extend(notes)
-        payload.notes.extend(response.get("notes", []))
         return payload
 
 
