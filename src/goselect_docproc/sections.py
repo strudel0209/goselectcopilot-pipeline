@@ -37,10 +37,14 @@ from dataclasses import dataclass
 from typing import Any
 
 from . import geometry as geo
-from .contracts import SectionNode
+from .contracts import ContentType, SectionNode
 from .spans import overlaps
 
 HEADING_ROLES = ("title", "sectionHeading")
+
+# Content that owns its identity. A sheet carries its own title block and is
+# never a clause of whatever prose happens to precede it in the file.
+SELF_TITLING = frozenset({ContentType.DRAWING, ContentType.PLAN})
 NUMBERED = re.compile(r"^\s*(\d+(?:\.\d+)*)[\s.\-\u2013)]+\S")
 # Leading bullets must never be promoted to headings.
 BULLET = re.compile(r"^\s*[-\u2022\u00b7\u25cf\u25aa*\u2013\u2014]\s+")
@@ -139,22 +143,32 @@ def _looks_like_heading(text: str) -> bool:
     return bool(NUMBERED.match(text)) or text.istitle() or text.isupper()
 
 
-def _di_section_tree(result: Any) -> tuple[list[SectionNode], list[tuple[int, int]]]:
-    """Walk DI's ``sections`` tree, returning headings and per-document boundaries.
+# What a producer must reduce its native models to. Offsets are absolute into the
+# one immutable content string; page is 1-based.
+ParagraphRef = tuple[int, int, str]
+SectionRef = tuple[tuple[int, int] | None, list[str]]
 
-    A single ``sections`` entry is the bare root: a drawing sheet has no document
-    structure, and inventing headings for one is how handwriting becomes a clause.
+
+def tree_index(
+    sections: list[SectionRef], paragraphs: list[ParagraphRef | None]
+) -> tuple[list[SectionNode], list[tuple[int, int]]]:
+    """Walk a service's ``sections`` tree into headings and document boundaries.
+
+    Producer-neutral on purpose: Document Intelligence and Content Understanding
+    return the same shape - a span plus JSON-pointer ``elements`` - under
+    different attribute names, and the policy below is the part worth sharing.
+
+    A single entry is the bare root: a drawing sheet has no document structure,
+    and inventing headings for one is how handwriting becomes a clause.
     """
-    sections = list(getattr(result, "sections", None) or [])
     if len(sections) < 2:
         return [], []
-    paragraphs = list(result.paragraphs or [])
 
     def ref_index(ref: str) -> int:
         return int(ref.rsplit("/", 1)[1])
 
-    def heading_paragraph(section: Any) -> Any:
-        for ref in section.elements or []:
+    def heading_of(elements: list[str]) -> ParagraphRef | None:
+        for ref in elements:
             if ref.startswith("/paragraphs/"):
                 i = ref_index(ref)
                 return paragraphs[i] if i < len(paragraphs) else None
@@ -165,34 +179,47 @@ def _di_section_tree(result: Any) -> tuple[list[SectionNode], list[tuple[int, in
     def walk(index: int, level: int) -> None:
         if index >= len(sections):
             return
-        section = sections[index]
-        paragraph = heading_paragraph(section)
-        if paragraph is not None and paragraph.spans and paragraph.bounding_regions:
-            text = _clean(paragraph.content)
+        _, elements = sections[index]
+        paragraph = heading_of(elements)
+        if paragraph is not None:
+            offset, page, content = paragraph
+            text = _clean(content)
             if _is_substantive(text) and len(text) <= MAX_HEADING_CHARS:
                 nodes.append(
-                    SectionNode(
-                        offset=paragraph.spans[0].offset,
-                        heading=text,
-                        page=paragraph.bounding_regions[0].page_number,
-                        level=level,
-                    )
+                    SectionNode(offset=offset, heading=text, page=page, level=level)
                 )
-        for ref in section.elements or []:
+        for ref in elements:
             if ref.startswith("/sections/"):
                 walk(ref_index(ref), level + 1)
 
     boundaries: list[tuple[int, int]] = []
-    for ref in sections[0].elements or []:
+    for ref in sections[0][1]:
         if not ref.startswith("/sections/"):
             continue
         index = ref_index(ref)
         walk(index, 1)
-        spans = getattr(sections[index], "spans", None) or []
-        if spans:
-            boundaries.append((spans[0].offset, spans[0].offset + spans[0].length))
+        if index < len(sections):
+            span = sections[index][0]
+            if span:
+                boundaries.append((span[0], span[0] + span[1]))
 
     return sorted(nodes, key=lambda n: n.offset), boundaries
+
+
+def _di_section_tree(result: Any) -> tuple[list[SectionNode], list[tuple[int, int]]]:
+    """Adapt the Document Intelligence object model onto ``tree_index``."""
+    paragraphs: list[ParagraphRef | None] = [
+        (p.spans[0].offset, p.bounding_regions[0].page_number, p.content)
+        if p.spans and p.bounding_regions
+        else None
+        for p in (result.paragraphs or [])
+    ]
+    sections: list[SectionRef] = []
+    for section in getattr(result, "sections", None) or []:
+        spans = getattr(section, "spans", None) or []
+        span = (spans[0].offset, spans[0].length) if spans else None
+        sections.append((span, list(section.elements or [])))
+    return tree_index(sections, paragraphs)
 
 
 def build_section_index(result: Any, min_role_headings: int = 3) -> SectionIndex:

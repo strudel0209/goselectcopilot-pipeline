@@ -53,6 +53,10 @@
 
 ## Taxonomy (customer's, adopted)
 Five categories, lowercase, one per `ContentType`: text / schedule / drawing / plan / other.
+Verified live on 2026-08-24 against goselectRouterV2:
+- 98624_1_VFDSchedule.pdf   -> 1 seg, SCHEDULE conf 0.98, coverage 100%
+- 98813_2_VFDDrawingsNewmarketNHWTF.pdf -> p1 PLAN conf 0.98, p2-3 DRAWING conf 0.99, coverage 100%
+  The old 4-category taxonomy called all three "Drawing". Plan/drawing separation is real.
 - `drawing` vs `plan` is the load-bearing split. Both are bordered sheets with a title block.
   drawing = schematic, symbols joined by lines, connectivity, NOT to scale (one-line, single line,
   network, control/ladder). plan = scaled view of physical space with dimensions (site, building,
@@ -70,6 +74,20 @@ Five categories, lowercase, one per `ContentType`: text / schedule / drawing / p
   sparse bordered sheets, so geometry can't separate them. Only the CU classifier can. Another point
   for CU in the bench-off.
 
+## Open defects (measured, not guessed)
+- **CU classification is not deterministic and there is no cache.** Two consecutive `segment` runs on
+  identical bytes of 98813_2_VFDDrawingsNewmarketNHWTF.pdf returned different segmentation:
+  run 1 = PLAN p1 (0.98) + DRAWING p2-3 (0.99); run 2 = one DRAWING p1-3 (0.99). n=2, needs proper
+  measurement, but it matters three ways: the scorecard is not reproducible from a single run, every
+  run bills again (DI results cache by SHA-256, CU results do not), and the plan-drop guarantee is
+  only as stable as the classifier. Consider caching the AnalysisResult by content hash.
+- **The roles fallback promotes title-block furniture.** On that same drawing package CU returned no
+  `sections` array, so the flat role scan ran and tagged `'5/16/2025 11:00:55 AM'` - a plot timestamp
+  with role `title` - as a heading, which then became the segment's section_root. `SELF_TITLING` does
+  not help: the rule blocks inheriting a *preceding* clause, and this heading sits at the segment
+  start so it reads as the sheet's own title. This is what the `section_heading_f1` gate exists to
+  catch; do not hand-patch it, label it.
+
 ## Refactor plan (module verdicts)
 DELETE: segmentation.py (208), regions.py (140), geometry.py (62), models.py (150),
         layout.py + producers/di_layout.py (265), hand-rolled REST client in content_understanding.py (~200),
@@ -84,15 +102,28 @@ Net: ~1,400-1,600 of ~3,850 src lines removable (~40%).
 ## Steps
 0. ~~Fix contentCategories descriptions to <=120 combined~~ WITHDRAWN, the limit is not real.
    DONE instead: adopted the customer's 5-category taxonomy + PLAN drop.  [NO preview needed]
-1. Replace urllib client with ContentUnderstandingClient  [NO preview needed]  <- NEXT
-2. Point section index at CU native `sections` tree       [NO preview needed]
+1. ~~Replace urllib client with ContentUnderstandingClient~~ DONE. `AzureContentUnderstandingClient`
+   and `_as_namespace` deleted; producer speaks SDK models directly; tests build real
+   `AnalysisResult`. Analyzer is now a typed `ContentAnalyzer` from `router_analyzer()`.
+   `begin_create_analyzer(..., allow_replace=True)` replaces server-side - no 409, no delete window.
+2. ~~Point section index at CU native `sections` tree~~ DONE. Walker extracted from sections.py into
+   producer-neutral `tree_index(sections, paragraphs)`; DI and CU both adapt onto it. CU strategy is
+   now `content-understanding-sections` (tree) -> `-sections-flat` (bare root, emit nothing) ->
+   `-roles` (flat fallback). Also fixed: PLAN was inheriting prose clauses because the rule said
+   `is not DRAWING`; now `not in SELF_TITLING = {DRAWING, PLAN}`.
 3. Lift vfd_motor_schema_v1_0.json into a CU field_schema + estimate_field_source_and_confidence;
-   delete per-type schemas and expand()                   [NO preview needed]
+   delete per-type schemas and expand()                   [NO preview needed]  <- NEXT
 4. Bench allow_in_page_segments vs regions.py on Package A via eval/score.py  [preview]
 5. Delete segmentation/regions/geometry/layout/di_layout if 4 holds           [preview]
 6. Agentic control arm on Package B drawings vs the tiling path               [preview]
 
 ## Gotchas hit
+- Analyzer create is NOT an upsert: a bare PUT/create returns 409 ModelExists, and PATCH reaches only
+  description and tags. Use `allow_replace=True`. A stale analyzer returns categories the routing
+  table lacks and every segment silently downgrades to OTHER - now logged as a warning.
+- `cli.main()` built the argparse parser BEFORE `load_dotenv()`, so `default=os.getenv("CU_ANALYZER_ID")`
+  was always None and setup-analyzer targeted the wrong analyzer while the producer used the right
+  one. dotenv now loads first.
 - Docs prose is not the contract. The 120-char category limit came from a docs table and is
   contradicted by both API specs. Check azure-rest-api-specs before asserting a limit.
 - setuptools cannot follow `-r` includes in a requirements file for dynamic metadata:

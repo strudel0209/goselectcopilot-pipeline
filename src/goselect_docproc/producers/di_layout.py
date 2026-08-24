@@ -18,7 +18,7 @@ from typing import Any
 from ..contracts import ContentType, Segment
 from ..layout import LayoutClient, LayoutOptions
 from ..regions import figure_ids, page_regions
-from ..sections import build_section_index
+from ..sections import SELF_TITLING, build_section_index
 from ..segmentation import HeuristicClassifier, PageClassifier, build_segments, profile_pages
 from .base import DocumentAnalysis, ProducerCapabilities, ProducerCost, register
 
@@ -65,7 +65,7 @@ class DILayoutProducer:
             ]
             segment = Segment(**descriptor, regions=sorted(regions, key=lambda r: r.start))
             segment.section_root = index.root_for(
-                segment.start, inherits=content_type is not ContentType.DRAWING
+                segment.start, inherits=content_type not in SELF_TITLING
             )
             segments.append(segment)
             figures[segment.segment_id] = figure_ids(
