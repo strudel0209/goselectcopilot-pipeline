@@ -9,25 +9,22 @@
   // (files.pythonhosted.org) is not routable here; the CFS proxy is.
   "containerEnv": {
     "PIP_INDEX_URL": "https://packagefeedproxy.microsoft.io/pypi/simple/",
-    "NPM_CONFIG_REGISTRY": "https://packagefeedproxy.microsoft.io/npm/registry/",
-    "PIP_DISABLE_PIP_VERSION_CHECK": "1",
-    "PIP_NO_INPUT": "1"
+    "PIP_DISABLE_PIP_VERSION_CHECK": "1"
   },
   "customizations": {
     "vscode": {
       "extensions": [
         "ms-python.python",
         "ms-python.vscode-pylance",
-        "ms-toolsai.jupyter",
-        "ms-azuretools.vscode-azureresourcegroups",
-        "ms-python.vscode-python-envs"
+        "ms-azuretools.vscode-azureresourcegroups"
       ],
       "settings": {
-        "python.defaultInterpreterPath": "${containerWorkspaceFolder}/.venv/bin/python",
-        "python.terminal.activateEnvironment": true,
-        "jupyter.notebookFileRoot": "${workspaceFolder}"
+        "python.defaultInterpreterPath": "/usr/local/bin/python3"
       }
     }
   },
-  "postCreateCommand": "bash .devcontainer/setup.sh"
+  // --user because site-packages belongs to root and this container does not.
+  // Never a venv: the workspace is a 9p bind mount and writing an environment
+  // across it takes minutes rather than seconds.
+  "postCreateCommand": "pip install --user -e .[dev]"
 }

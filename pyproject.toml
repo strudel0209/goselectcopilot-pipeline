@@ -8,8 +8,10 @@ version = "0.1.0"
 description = "Segment-level document processing for the ABB GoSelect Copilot pipeline"
 requires-python = ">=3.11"
 # Runtime dependencies live in requirements.txt so there is one list, not two.
-# requirements-dev.txt is pip-only: setuptools cannot follow its `-r` include.
 dynamic = ["dependencies"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.2"]
 
 [tool.setuptools.dynamic]
 dependencies = { file = ["requirements.txt"] }

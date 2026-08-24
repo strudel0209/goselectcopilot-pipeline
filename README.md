@@ -485,18 +485,19 @@ needs no flags.
 
 ```bash
 # The devcontainer does this for you on create; this is the manual equivalent.
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements-dev.txt
-pip install -e . --no-deps
+# No venv: the workspace is a bind mount, and --user installs to the container's
+# own filesystem instead of across it.
+pip install --user -e .[dev]
 
 cp .env.example .env                     # fill in the two endpoints
 az login                                 # DefaultAzureCredential
 
-pytest -q                                # 102 tests, no cloud calls, no spend
+pytest -q                                # 150 tests, no cloud calls, no spend
 ```
 
-Dependencies live in `requirements.txt` (runtime) and `requirements-dev.txt`
-(tests, eval, notebooks). `pyproject.toml` reads them, so there is one list.
+Runtime dependencies live in `requirements.txt`, which `pyproject.toml` reads, so
+there is one list. `pytest` is the only dev dependency and is declared as the
+`dev` extra.
 
 | Command | Cost | Purpose |
 |---|---|---|
