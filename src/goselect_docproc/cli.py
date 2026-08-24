@@ -64,14 +64,22 @@ def _producer(name: str, cache_dir: Path):
 
 
 def _content_understanding_client():
-    from .producers.content_understanding import AzureContentUnderstandingClient
+    from azure.ai.contentunderstanding import ContentUnderstandingClient
 
     endpoint = os.getenv("CONTENTUNDERSTANDING_ENDPOINT")
     if not endpoint:
         raise SystemExit("CONTENTUNDERSTANDING_ENDPOINT is not set")
-    return AzureContentUnderstandingClient(
-        endpoint, api_key=os.getenv("CONTENTUNDERSTANDING_API_KEY") or None
-    )
+
+    key = os.getenv("CONTENTUNDERSTANDING_API_KEY")
+    if key:
+        from azure.core.credentials import AzureKeyCredential
+
+        credential = AzureKeyCredential(key)
+    else:
+        from azure.identity import DefaultAzureCredential
+
+        credential = DefaultAzureCredential()
+    return ContentUnderstandingClient(endpoint=endpoint, credential=credential)
 
 
 def _sources(paths: list[str]) -> dict[str, tuple[bytes, str]]:
@@ -243,13 +251,14 @@ def cmd_bench(args: argparse.Namespace) -> int:
 
 
 def cmd_setup_analyzer(args: argparse.Namespace) -> int:
-    """One-off: PUT the Content Understanding router analyzer."""
-    from .producers.content_understanding import ROUTER_ANALYZER
+    """One-off: create the Content Understanding router analyzer."""
+    from .producers.content_understanding import ensure_analyzer, router_analyzer
 
+    analyzer = router_analyzer(in_page_segments=args.in_page_segments)
     client = _content_understanding_client()
-    client.ensure_analyzer(args.analyzer_id, ROUTER_ANALYZER)
-    print(f"analyzer {args.analyzer_id} ready at {client.endpoint}")
-    _write(Path(args.out), "cu-router.json", ROUTER_ANALYZER)
+    ensure_analyzer(client, args.analyzer_id, analyzer)
+    print(f"analyzer {args.analyzer_id} ready")
+    _write(Path(args.out), "cu-router.json", analyzer.as_dict())
     return 0
 
 
@@ -267,6 +276,15 @@ def cmd_tiles(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Before the parser: argparse evaluates env-derived defaults at add_argument
+    # time, so loading later silently ignores CU_ANALYZER_ID.
+    try:
+        from dotenv import load_dotenv
+
+        load_dotenv()
+    except ImportError:
+        pass
+
     parser = argparse.ArgumentParser(prog="goselect-docproc")
     parser.add_argument("-v", "--verbose", action="store_true")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -322,6 +340,11 @@ def main(argv: list[str] | None = None) -> int:
         "setup-analyzer", help="one-off: create the Content Understanding router analyzer"
     )
     p_setup.add_argument("--analyzer-id", default=os.getenv("CU_ANALYZER_ID", DEFAULT_ANALYZER_ID))
+    p_setup.add_argument(
+        "--in-page-segments",
+        action="store_true",
+        help="preview: let a segment cover part of a page",
+    )
     p_setup.add_argument("--out", default="out")
     p_setup.set_defaults(func=cmd_setup_analyzer)
 
@@ -330,12 +353,6 @@ def main(argv: list[str] | None = None) -> int:
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(levelname)s %(name)s: %(message)s",
     )
-    try:
-        from dotenv import load_dotenv
-
-        load_dotenv()
-    except ImportError:
-        pass
     return args.func(args)
 
 

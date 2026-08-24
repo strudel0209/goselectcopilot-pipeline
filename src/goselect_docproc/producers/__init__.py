@@ -14,7 +14,7 @@ from .base import (
     get,
     register,
 )
-from .content_understanding import ROUTER_ANALYZER, ContentUnderstandingProducer
+from .content_understanding import ContentUnderstandingProducer, router_analyzer
 from .di_layout import DILayoutProducer
 
 __all__ = [
@@ -23,7 +23,7 @@ __all__ = [
     "DocumentAnalysis",
     "ProducerCapabilities",
     "ProducerCost",
-    "ROUTER_ANALYZER",
+    "router_analyzer",
     "SegmentProducer",
     "available",
     "get",

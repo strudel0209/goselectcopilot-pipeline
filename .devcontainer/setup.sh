@@ -35,6 +35,8 @@ echo "Environment ready: $(pwd)/.venv/bin/python"
 .venv/bin/python - <<'PY'
 from importlib.metadata import version
 
+from azure.core.credentials import AzureKeyCredential
+
 from azure.ai.contentunderstanding._configuration import (
     ContentUnderstandingClientConfiguration,
 )
@@ -42,7 +44,9 @@ from azure.ai.contentunderstanding._configuration import (
 for package in ("azure-ai-contentunderstanding", "azure-ai-documentintelligence"):
     print(f"{package:34} {version(package)}")
 
-config = ContentUnderstandingClientConfiguration(endpoint="https://example", credential=object())
+config = ContentUnderstandingClientConfiguration(
+    endpoint="https://example", credential=AzureKeyCredential("probe")
+)
 print(f"{'content understanding api-version':34} {config.api_version}")
 PY
 

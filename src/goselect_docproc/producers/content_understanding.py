@@ -1,23 +1,18 @@
 """Content Understanding producer — Azure-native classify, split and route.
 
-``contentCategories`` classifies **and splits** a multi-document package in one
-call, with categories defined by description rather than training data. That
-removes the labelling burden the DI custom-classifier path carries.
+``contentCategories`` classifies **and splits** a package in one call, with
+categories defined by description rather than training data. That removes the
+labelling burden the DI custom-classifier path carries.
 
-**The limitation that shapes the design.** Content Understanding's minimum unit
-is one page:
+Everything here speaks the ``azure-ai-contentunderstanding`` models directly.
+There is no hand-rolled REST client and no dict/namespace duck-typing: the tests
+build the same ``AnalysisResult`` the service returns, so a field that moves
+breaks a test instead of silently reading ``None``.
 
-    "The minimum unit for classification of documents is a single page.
-     Intra-page classification isn't supported."
-
-So this producer emits **whole-page regions** and cannot separate a schedule
-from an inset diagram on the same sheet. On the ABB sample, **15 of 20 pages
-carry more than one content kind and 4 carry all three** — so on that corpus this
-producer structurally cannot match the DI path for intra-page
-routing. Whether that matters is precisely what the bench-off measures.
-
-Mitigation, and the reason this producer is still a serious contender: run it as
-the **router** and keep DI Layout for intra-page geometry.
+**Granularity.** Under the GA API the classifier's minimum unit is one page. The
+``2026-06-01-preview`` API adds ``allow_in_page_segments``, which lets a segment
+cover part of a page — the case that matters here, because a schedule is often
+printed on the same sheet as a drawing. Off by default until it is measured.
 """
 
 from __future__ import annotations
@@ -26,8 +21,18 @@ import hashlib
 import logging
 from typing import Any, Protocol, runtime_checkable
 
+from azure.ai.contentunderstanding.models import (
+    AnalysisInput,
+    AnalysisResult,
+    ContentAnalyzer,
+    ContentAnalyzerConfig,
+    ContentCategoryDefinition,
+    ContentSpan,
+    DocumentContent,
+)
+
 from ..contracts import ContentType, Region, SectionNode, Segment, Span
-from ..sections import SectionIndex
+from ..sections import SELF_TITLING, ParagraphRef, SectionIndex, SectionRef, tree_index
 from ..spans import subtract
 from .base import DocumentAnalysis, ProducerCapabilities, ProducerCost, register
 
@@ -35,16 +40,23 @@ log = logging.getLogger(__name__)
 
 FURNITURE_ROLES = {"pageHeader", "pageFooter", "pageNumber"}
 
-API_VERSION = "2025-11-01"
 USD_PER_PAGE = 0.010
 
 DEFAULT_ANALYZER_ID = "goselectRouter"
 
+# gpt-4.1 retires October 2026. Measured equal to the flagship on specification
+# prose, so the mini is the default here too.
+DEFAULT_COMPLETION_MODEL = "gpt-5.4-mini"
+
 # The general "description properties" cap. The classifier page also quotes 120
-# characters for name + description, but neither API version encodes any length
-# constraint on ContentCategoryDefinition.description, and longer descriptions
-# are accepted in practice - so that figure is not treated as a gate here.
+# characters for name + description, but neither API version encodes a length
+# constraint on ContentCategoryDefinition.description and longer descriptions are
+# accepted in practice, so that figure is not treated as a gate here.
 MAX_DESCRIPTION_CHARS = 1024
+
+# Below this a tree is too thin to trust, and the flat role scan is the better
+# guess. Matches the Document Intelligence path so the two are comparable.
+MIN_TREE_HEADINGS = 3
 
 CATEGORY_TO_KIND: dict[str, ContentType] = {
     "text": ContentType.TEXT,
@@ -54,75 +66,99 @@ CATEGORY_TO_KIND: dict[str, ContentType] = {
     "other": ContentType.OTHER,
 }
 
-ROUTER_ANALYZER: dict[str, Any] = {
-    "baseAnalyzerId": "prebuilt-document",
-    "description": "GoSelect Copilot router: classify and split a specification package",
-    "config": {
-        "returnDetails": True,
-        "enableSegment": True,
-        # Must be declared false: the service default is true, and on a drawing the
-        # box around a tag is read as a radical sign - VFD-401 becomes \sqrt{150-401}.
-        "enableFormula": False,
-        # Add "analyzerId" to a category to route it to a purpose-built analyzer.
-        # Categories describe what a human sees, not what the pipeline does with
-        # it. `drawing` and `plan` are the load-bearing split: both are sheets
-        # with a border and a title block, but only one carries connectivity.
-        "contentCategories": {
-            "text": {
-                "description": (
-                    "Prose and symbol keys: general notes, legends, abbreviation lists, "
-                    "specifications, method statements or correspondence. Mostly running "
-                    "text, not a table or a drawing."
-                )
-            },
-            "schedule": {
-                "description": (
-                    "Any tabular schedule or list with one row per item and repeating "
-                    "columns: equipment, starters, panels, cables, instruments, I/O "
-                    "points, parts lists, relay settings, datasheets or test records. "
-                    "Usually titled SCHEDULE, LIST or TABLE, and often printed on the "
-                    "same sheet as a drawing."
-                )
-            },
-            "drawing": {
-                "description": (
-                    "A schematic drawing: symbols joined by lines to show how things "
-                    "connect, not where they physically are, and not to scale. Covers "
-                    "electrical one-line and single line diagrams, network and "
-                    "communications diagrams, and control or elementary ladder diagrams. "
-                    "The drawn body only - a tabular schedule on the same sheet is a "
-                    "schedule, not the drawing."
-                )
-            },
-            "plan": {
-                "description": (
-                    "A scaled view of physical space or hardware, with dimensions: site "
-                    "and building plans, equipment layouts, routing and grounding plans, "
-                    "and construction details such as sections, elevations and profile "
-                    "views. Shows where things physically are and how they are built, "
-                    "not how they connect."
-                )
-            },
-            # Without a catch-all, content is forced into one of the categories above.
-            "other": {
-                "description": (
-                    "Content that matches none of the other categories, including "
-                    "blank pages."
-                )
-            },
-        },
-    },
-    # gpt-4.1 retires October 2026. Measured equal to the flagship on specification
-    # prose, so the mini is the default here too.
-    "models": {"completion": "gpt-5.4-mini"},
+# Categories describe what a human sees, not what the pipeline does with it.
+# `drawing` and `plan` are the load-bearing split: both are sheets with a border
+# and a title block, but only one carries connectivity.
+DOCUMENT_CATEGORIES: dict[str, ContentCategoryDefinition] = {
+    "text": ContentCategoryDefinition(
+        description=(
+            "Prose and symbol keys: general notes, legends, abbreviation lists, "
+            "specifications, method statements or correspondence. Mostly running text, "
+            "not a table or a drawing."
+        )
+    ),
+    "schedule": ContentCategoryDefinition(
+        description=(
+            "Any tabular schedule or list with one row per item and repeating columns: "
+            "equipment, starters, panels, cables, instruments, I/O points, parts lists, "
+            "relay settings, datasheets or test records. Usually titled SCHEDULE, LIST "
+            "or TABLE, and often printed on the same sheet as a drawing."
+        )
+    ),
+    "drawing": ContentCategoryDefinition(
+        description=(
+            "A schematic drawing: symbols joined by lines to show how things connect, "
+            "not where they physically are, and not to scale. Covers electrical one-line "
+            "and single line diagrams, network and communications diagrams, and control "
+            "or elementary ladder diagrams. The drawn body only - a tabular schedule on "
+            "the same sheet is a schedule, not the drawing."
+        )
+    ),
+    "plan": ContentCategoryDefinition(
+        description=(
+            "A scaled view of physical space or hardware, with dimensions: site and "
+            "building plans, equipment layouts, routing and grounding plans, and "
+            "construction details such as sections, elevations and profile views. Shows "
+            "where things physically are and how they are built, not how they connect."
+        )
+    ),
+    # Without a catch-all, content is forced into one of the categories above.
+    "other": ContentCategoryDefinition(
+        description="Content that matches none of the other categories, including blank pages."
+    ),
 }
 
 
-@runtime_checkable
-class ContentUnderstandingClient(Protocol):
-    """Seam over the analyze call so mapping is testable without a key."""
+def router_analyzer(
+    completion_model: str = DEFAULT_COMPLETION_MODEL,
+    *,
+    in_page_segments: bool = False,
+) -> ContentAnalyzer:
+    """The classify-and-split analyzer. Set ``analyzer_id`` on a category to route
+    it to a purpose-built analyzer."""
+    return ContentAnalyzer(
+        base_analyzer_id="prebuilt-document",
+        description="GoSelect Copilot router: classify and split a specification package",
+        config=ContentAnalyzerConfig(
+            return_details=True,
+            enable_segment=True,
+            allow_in_page_segments=in_page_segments,
+            # Must be declared false: the service default is true, and on a drawing the
+            # box around a tag reads as a radical sign - VFD-401 becomes \\sqrt{150-401}.
+            enable_formula=False,
+            estimate_field_source_and_confidence=True,
+            content_categories=DOCUMENT_CATEGORIES,
+        ),
+        models={"completion": completion_model},
+    )
 
-    def analyze(self, *, analyzer_id: str, data: bytes, source_uri: str | None = None) -> Any: ...
+
+@runtime_checkable
+class AnalyzeClient(Protocol):
+    """The slice of ``ContentUnderstandingClient`` this producer uses."""
+
+    def begin_analyze_binary(self, analyzer_id: str, binary_input: bytes, **kwargs: Any) -> Any: ...
+
+    def begin_analyze(self, analyzer_id: str, **kwargs: Any) -> Any: ...
+
+
+def ensure_analyzer(
+    client: Any, analyzer_id: str, analyzer: ContentAnalyzer | None = None
+) -> ContentAnalyzer:
+    """Create the analyzer, replacing any existing one.
+
+    ``allow_replace`` is the service performing delete-then-create itself. A bare
+    create returns 409 ModelExists, and PATCH reaches only description and tags,
+    so a changed category set cannot be applied in place. An analyzer left on a
+    stale taxonomy returns categories the routing table has no entry for, and
+    every segment silently downgrades to OTHER.
+    """
+    poller = client.begin_create_analyzer(
+        analyzer_id, analyzer or router_analyzer(), allow_replace=True
+    )
+    created = poller.result()
+    log.info("analyzer %s ready", analyzer_id)
+    return created
 
 
 @register("content-understanding")
@@ -130,13 +166,13 @@ class ContentUnderstandingProducer:
     capabilities = ProducerCapabilities(
         native_regions=True,
         native_figure_crops=False,
-        intra_page=True,  # classifier is page-level, but the layout model is not
+        intra_page=True,  # classifier is page-level unless allow_in_page_segments is on
         residency="azure-native",
     )
 
     def __init__(
         self,
-        client: ContentUnderstandingClient,
+        client: AnalyzeClient,
         analyzer_id: str = DEFAULT_ANALYZER_ID,
         usd_per_page: float = USD_PER_PAGE,
     ) -> None:
@@ -145,47 +181,24 @@ class ContentUnderstandingProducer:
         self.usd_per_page = usd_per_page
 
     def analyze(self, file_id: str, data: bytes, source_uri: str | None = None) -> DocumentAnalysis:
-        response = self.client.analyze(
-            analyzer_id=self.analyzer_id, data=data, source_uri=source_uri
-        )
-        item = _first_content(response)
+        item = _first_document(self._call(data, source_uri))
         if item is None:
-            raise RuntimeError("content understanding returned no contents")
+            raise RuntimeError("content understanding returned no document content")
 
-        content = _get(item, "markdown") or ""
-        pages = _get(item, "pages") or []
+        content = item.markdown or ""
+        pages = list(item.pages or [])
         page_of = _page_lookup(pages)
 
         claims = _classify_elements(item, page_of)
-        segments: list[Segment] = []
+        segments = [
+            self._segment(file_id, index, block, claims)
+            for index, block in enumerate(item.segments or [], start=1)
+        ]
 
-        for index, block in enumerate(_get(item, "segments") or [], start=1):
-            span = _get(block, "span") or {}
-            offset = int(_get(span, "offset") or 0)
-            length = int(_get(span, "length") or 0)
-            first = int(_get(block, "startPageNumber") or 1)
-            last = int(_get(block, "endPageNumber") or first)
-            category = _get(block, "category") or "Other"
-            content_type = CATEGORY_TO_KIND.get(category, ContentType.OTHER)
-
-            segments.append(
-                Segment(
-                    segment_id=f"{file_id}-seg-{index:03d}",
-                    file_id=file_id,
-                    first_page=first,
-                    last_page=last,
-                    content_type=content_type,
-                    confidence=round(float(_get(block, "confidence") or 1.0), 3),
-                    page_confidences=[1.0] * (last - first + 1),
-                    regions=_regions_for(claims, offset, offset + length, content_type),
-                    producer=self.name,
-                )
-            )
-
-        index_ = _section_index_from(item, content)
+        index_ = _section_index_from(item, page_of)
         for segment in segments:
             segment.section_root = index_.root_for(
-                segment.start, inherits=segment.content_type is not ContentType.DRAWING
+                segment.start, inherits=segment.content_type not in SELF_TITLING
             )
 
         page_count = len(pages) or max((s.last_page for s in segments), default=0)
@@ -202,40 +215,79 @@ class ContentUnderstandingProducer:
                 api_calls=1,
                 usd_estimate=round(page_count * self.usd_per_page, 6),
             ),
-            furniture_spans=[Span(offset=o, length=l) for o, l, _, _ in claims if _ is None],
+            furniture_spans=[Span(offset=o, length=l) for o, l, _, kind in claims if kind is None],
             native=item,
-            warnings=[
-                "classifier granularity is one page; intra-page regions come from "
-                "the layout model, not the classifier"
-            ],
+        )
+
+    def _call(self, data: bytes, source_uri: str | None) -> AnalysisResult:
+        """A URL is the documented input; binary upload is first-class too."""
+        if source_uri and source_uri.startswith(("http://", "https://")):
+            poller = self.client.begin_analyze(
+                self.analyzer_id, inputs=[AnalysisInput(url=source_uri)]
+            )
+        else:
+            poller = self.client.begin_analyze_binary(self.analyzer_id, binary_input=data)
+        return poller.result()
+
+    def _segment(self, file_id: str, index: int, block: Any, claims: list[_Claim]) -> Segment:
+        span = block.span or ContentSpan(offset=0, length=0)
+        offset = int(span.offset or 0)
+        first = int(block.start_page_number or 1)
+        last = int(block.end_page_number or first)
+        category = block.category or "other"
+
+        content_type = CATEGORY_TO_KIND.get(category)
+        if content_type is None:
+            # Almost always a deployed analyzer that predates the routing table.
+            log.warning(
+                "category %r is not in the routing table %s; routing to OTHER. "
+                "Re-run setup-analyzer if the taxonomy changed.",
+                category,
+                sorted(CATEGORY_TO_KIND),
+            )
+            content_type = ContentType.OTHER
+
+        confidence = block.confidence if block.confidence is not None else 1.0
+        return Segment(
+            segment_id=f"{file_id}-seg-{index:03d}",
+            file_id=file_id,
+            first_page=first,
+            last_page=last,
+            content_type=content_type,
+            confidence=round(float(confidence), 3),
+            page_confidences=[1.0] * (last - first + 1),
+            regions=_regions_for(claims, offset, offset + int(span.length or 0), content_type),
+            producer=self.name,
         )
 
     def figure_image(self, analysis: DocumentAnalysis, figure_id: str) -> bytes | None:
+        """Figure output is a description plus chart.js or mermaid, never bytes."""
         return None
 
 
-def _get(obj: Any, key: str, default: Any = None) -> Any:
-    """Content Understanding responses arrive as dicts or namespaces."""
-    if isinstance(obj, dict):
-        return obj.get(key, default)
-    return getattr(obj, key, default)
+# ---------------------------------------------------------------------------
+# response mapping
+# ---------------------------------------------------------------------------
+
+# (offset, length, page, kind). ``kind`` is None for declared page furniture.
+_Claim = tuple[int, int, int, ContentType | None]
 
 
-def _first_content(response: Any) -> Any:
-    contents = _get(response, "contents")
-    if contents:
-        return contents[0]
-    return response if _get(response, "markdown") else None
+def _first_document(response: AnalysisResult) -> DocumentContent | None:
+    for content in response.contents or []:
+        if getattr(content, "markdown", None) is not None:
+            return content  # type: ignore[return-value]
+    return None
 
 
 def _page_lookup(pages: list[Any]) -> list[tuple[int, int, int]]:
     """``(start, end, pageNumber)`` so an element span resolves to a page."""
     out: list[tuple[int, int, int]] = []
     for page in pages:
-        number = int(_get(page, "pageNumber") or 0)
-        for span in _get(page, "spans") or []:
-            offset = int(_get(span, "offset") or 0)
-            out.append((offset, offset + int(_get(span, "length") or 0), number))
+        number = int(page.page_number or 0)
+        for span in page.spans or []:
+            offset = int(span.offset or 0)
+            out.append((offset, offset + int(span.length or 0), number))
     return sorted(out)
 
 
@@ -247,45 +299,41 @@ def _page_for(offset: int, lookup: list[tuple[int, int, int]]) -> int:
 
 
 def _span_of(element: Any) -> tuple[int, int] | None:
-    """Layout elements carry ``span`` (singular); segments do too."""
-    span = _get(element, "span")
+    """Layout elements carry ``span``; pages carry ``spans``."""
+    span = getattr(element, "span", None)
     if span is None:
-        spans = _get(element, "spans") or []
+        spans = getattr(element, "spans", None) or []
         span = spans[0] if spans else None
     if span is None:
         return None
-    return int(_get(span, "offset") or 0), int(_get(span, "length") or 0)
+    return int(span.offset or 0), int(span.length or 0)
 
 
-def _classify_elements(
-    item: Any, page_of: list[tuple[int, int, int]]
-) -> list[tuple[int, int, int, ContentType | None]]:
+def _classify_elements(item: DocumentContent, page_of: list[tuple[int, int, int]]) -> list[_Claim]:
     """Tables and figures claim first; unclaimed paragraphs are narrative.
 
     ``None`` as the kind marks page furniture, which is dropped by design and
     declared so the coverage proof does not count it as loss.
     """
     claimed: list[tuple[int, int]] = []
-    out: list[tuple[int, int, int, ContentType | None]] = []
+    out: list[_Claim] = []
 
     for element, kind in (
-        *(( t, ContentType.SCHEDULE) for t in (_get(item, "tables") or [])),
-        *((f, ContentType.DRAWING) for f in (_get(item, "figures") or [])),
+        *((t, ContentType.SCHEDULE) for t in (item.tables or [])),
+        *((f, ContentType.DRAWING) for f in (item.figures or [])),
     ):
         span = _span_of(element)
         if not span or not span[1]:
             continue
-        kept = subtract([span], claimed)
-        for offset, length in kept:
+        for offset, length in subtract([span], claimed):
             claimed.append((offset, length))
             out.append((offset, length, _page_for(offset, page_of), kind))
 
-    for paragraph in _get(item, "paragraphs") or []:
+    for paragraph in item.paragraphs or []:
         span = _span_of(paragraph)
         if not span or not span[1]:
             continue
-        role = _get(paragraph, "role")
-        if role in FURNITURE_ROLES:
+        if paragraph.role in FURNITURE_ROLES:
             claimed.append(span)
             out.append((span[0], span[1], _page_for(span[0], page_of), None))
             continue
@@ -297,10 +345,7 @@ def _classify_elements(
 
 
 def _regions_for(
-    claims: list[tuple[int, int, int, ContentType | None]],
-    start: int,
-    end: int,
-    segment_type: ContentType,
+    claims: list[_Claim], start: int, end: int, segment_type: ContentType
 ) -> list[Region]:
     """Group this segment's claims into one region per (page, kind)."""
     grouped: dict[tuple[int, ContentType], list[tuple[int, int]]] = {}
@@ -321,157 +366,48 @@ def _regions_for(
     return sorted(regions, key=lambda r: r.start)
 
 
-def _section_index_from(item: Any, content: str) -> SectionIndex:
-    """``sections`` is a native outline; fall back to heading-role paragraphs."""
-    nodes: list[SectionNode] = []
-    page_of = _page_lookup(_get(item, "pages") or [])
-
-    for paragraph in _get(item, "paragraphs") or []:
-        if _get(paragraph, "role") not in ("title", "sectionHeading"):
-            continue
+def _section_index_from(item: DocumentContent, page_of: list[tuple[int, int, int]]) -> SectionIndex:
+    """``sections`` is a real tree with nesting depth and document boundaries;
+    heading-role paragraphs are the flat fallback when the service returns none."""
+    paragraphs: list[ParagraphRef | None] = []
+    for paragraph in item.paragraphs or []:
         span = _span_of(paragraph)
-        text = (_get(paragraph, "content") or "").strip()
-        if not span or not text:
-            continue
-        nodes.append(
-            SectionNode(
-                offset=span[0],
-                heading=text.lstrip("#").strip(),
-                page=_page_for(span[0], page_of),
-                level=1,
-            )
+        paragraphs.append(
+            (span[0], _page_for(span[0], page_of), paragraph.content or "") if span else None
         )
 
+    sections: list[SectionRef] = [
+        (_span_of(section), list(section.elements or [])) for section in (item.sections or [])
+    ]
+    nodes, boundaries = tree_index(sections, paragraphs)
+    if len(nodes) >= MIN_TREE_HEADINGS:
+        return SectionIndex(
+            nodes=nodes,
+            strategy="content-understanding-sections",
+            role_headings=len(nodes),
+            boundaries=tuple(boundaries),
+        )
+
+    if sections and not nodes:
+        # The service analysed structure and found none. Scanning roles anyway is
+        # how every equipment label on a one-line diagram becomes a clause.
+        return SectionIndex(nodes=[], strategy="content-understanding-sections-flat", role_headings=0)
+
+    role_nodes: list[SectionNode] = []
+    for paragraph, ref in zip(item.paragraphs or [], paragraphs):
+        if ref is None or paragraph.role not in ("title", "sectionHeading"):
+            continue
+        offset, page, content = ref
+        heading = _heading(content)
+        if heading:
+            role_nodes.append(SectionNode(offset=offset, heading=heading, page=page, level=1))
+
     return SectionIndex(
-        nodes=sorted(nodes, key=lambda n: n.offset),
-        strategy="content-understanding-roles" if nodes else "content-understanding-none",
-        role_headings=len(nodes),
+        nodes=sorted(role_nodes, key=lambda n: n.offset),
+        strategy="content-understanding-roles" if role_nodes else "content-understanding-none",
+        role_headings=len(role_nodes),
     )
 
 
-class AzureContentUnderstandingClient:
-    """Minimal REST client. Stdlib only, so it adds no dependency.
-
-    Auth precedence: subscription key when supplied, otherwise Entra ID via
-    ``DefaultAzureCredential`` (which needs ``Cognitive Services User`` on the
-    Foundry resource).
-    """
-
-    SCOPE = "https://cognitiveservices.azure.com/.default"
-
-    def __init__(
-        self,
-        endpoint: str,
-        api_version: str = API_VERSION,
-        credential: Any = None,
-        api_key: str | None = None,
-        poll_seconds: float = 2.0,
-        timeout_seconds: float = 300.0,
-    ) -> None:
-        self.endpoint = endpoint.rstrip("/")
-        self.api_version = api_version
-        self.api_key = api_key or None
-        self.poll_seconds = poll_seconds
-        self.timeout_seconds = timeout_seconds
-
-        if self.api_key:
-            self.credential = None
-        else:
-            from azure.identity import DefaultAzureCredential
-
-            self.credential = credential or DefaultAzureCredential()
-
-    def _headers(self, content_type: str) -> dict[str, str]:
-        if self.api_key:
-            return {"Ocp-Apim-Subscription-Key": self.api_key, "Content-Type": content_type}
-        token = self.credential.get_token(self.SCOPE).token
-        return {"Authorization": f"Bearer {token}", "Content-Type": content_type}
-
-    def _request(self, method: str, url: str, body: bytes | None, content_type: str) -> Any:
-        import json as _json
-        import urllib.request
-
-        request = urllib.request.Request(
-            url, data=body, method=method, headers=self._headers(content_type)
-        )
-        with urllib.request.urlopen(request) as response:
-            payload = response.read()
-            location = response.headers.get("Operation-Location")
-            parsed = _json.loads(payload) if payload else {}
-            return parsed, location
-
-    def ensure_analyzer(self, analyzer_id: str, definition: dict[str, Any] | None = None) -> None:
-        """Create or update the analyzer. Creation is **asynchronous**: the PUT
-        returns 201 with an Operation-Location that must be polled, so this
-        blocks until the analyzer is actually usable.
-        """
-        import json as _json
-        import urllib.error
-
-        url = f"{self.endpoint}/contentunderstanding/analyzers/{analyzer_id}?api-version={self.api_version}"
-        body = _json.dumps(definition or ROUTER_ANALYZER).encode()
-        try:
-            _, operation = self._request("PUT", url, body, "application/json")
-        except urllib.error.HTTPError as exc:
-            detail = exc.read().decode(errors="replace")[:400]
-            raise RuntimeError(f"analyzer PUT failed ({exc.code}): {detail}") from exc
-
-        if operation:
-            self._poll(operation, what=f"analyzer {analyzer_id} creation")
-        log.info("analyzer %s ready", analyzer_id)
-
-    def _poll(self, operation_url: str, what: str) -> dict[str, Any]:
-        import time
-
-        deadline = time.monotonic() + self.timeout_seconds
-        while time.monotonic() < deadline:
-            payload, _ = self._request("GET", operation_url, None, "application/json")
-            status = str(payload.get("status", "")).lower()
-            if status in {"succeeded", "ready"}:
-                return payload
-            if status in {"failed", "canceled"}:
-                raise RuntimeError(f"{what} {status}: {payload.get('error')}")
-            time.sleep(self.poll_seconds)
-        raise TimeoutError(f"{what} did not complete within {self.timeout_seconds}s")
-
-    def analyze(self, *, analyzer_id: str, data: bytes, source_uri: str | None = None) -> Any:
-        """The documented request takes a **URL**, not raw bytes.
-
-        For local testing either upload the file to Blob and pass a SAS URL, or
-        rely on the undocumented binary endpoint used as a fallback below.
-        """
-        import json as _json
-        import urllib.error
-
-        base = f"{self.endpoint}/contentunderstanding/analyzers/{analyzer_id}"
-        version = f"?api-version={self.api_version}"
-
-        if source_uri and source_uri.startswith(("http://", "https://")):
-            body = _json.dumps({"inputs": [{"url": source_uri}]}).encode()
-            _, operation = self._request("POST", f"{base}:analyze{version}", body, "application/json")
-        else:
-            try:
-                _, operation = self._request(
-                    "POST", f"{base}:analyzeBinary{version}", data, "application/octet-stream"
-                )
-            except urllib.error.HTTPError as exc:
-                raise RuntimeError(
-                    "Content Understanding analyze needs an http(s) URL. Upload the "
-                    "document to Blob Storage and pass a SAS URL as source_uri "
-                    f"(binary fallback returned {exc.code})."
-                ) from exc
-
-        if not operation:
-            raise RuntimeError("no Operation-Location returned by analyze")
-        result = self._poll(operation, what="analyze")
-        return _as_namespace(result.get("result") or result)
-
-
-def _as_namespace(value: Any) -> Any:
-    from types import SimpleNamespace
-
-    if isinstance(value, dict):
-        return SimpleNamespace(**{k: _as_namespace(v) for k, v in value.items()})
-    if isinstance(value, list):
-        return [_as_namespace(v) for v in value]
-    return value
+def _heading(content: str) -> str:
+    return (content or "").strip().lstrip("#").strip()
