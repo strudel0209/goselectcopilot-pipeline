@@ -27,6 +27,7 @@ from azure.ai.contentunderstanding.models import (
     ContentAnalyzer,
     ContentAnalyzerConfig,
     ContentCategoryDefinition,
+    ContentFieldSchema,
     ContentSpan,
     DocumentContent,
 )
@@ -65,6 +66,11 @@ CATEGORY_TO_KIND: dict[str, ContentType] = {
     "plan": ContentType.PLAN,
     "other": ContentType.OTHER,
 }
+
+# Categories whose segments go straight into field extraction. DRAWING is absent
+# on purpose: it needs native-resolution tiles the service will not produce.
+# PLAN is absent because it is out of scope.
+FIELD_ROUTED_CATEGORIES = frozenset({"text", "schedule"})
 
 # Categories describe what a human sees, not what the pipeline does with it.
 # `drawing` and `plan` are the load-bearing split: both are sheets with a border
@@ -109,13 +115,44 @@ DOCUMENT_CATEGORIES: dict[str, ContentCategoryDefinition] = {
 }
 
 
+def field_analyzer(
+    schema: ContentFieldSchema, completion_model: str = DEFAULT_COMPLETION_MODEL
+) -> ContentAnalyzer:
+    """Extracts the agreed contract. Grounding is on: a value the service cannot
+    place on a page is one a reviewer cannot check."""
+    return ContentAnalyzer(
+        base_analyzer_id="prebuilt-document",
+        description="GoSelect Copilot fields: the agreed VFD/motor extraction contract",
+        config=ContentAnalyzerConfig(
+            return_details=True,
+            enable_formula=False,
+            estimate_field_source_and_confidence=True,
+        ),
+        field_schema=schema,
+        models={"completion": completion_model},
+    )
+
+
 def router_analyzer(
     completion_model: str = DEFAULT_COMPLETION_MODEL,
     *,
     in_page_segments: bool = False,
+    field_analyzer_id: str | None = None,
 ) -> ContentAnalyzer:
-    """The classify-and-split analyzer. Set ``analyzer_id`` on a category to route
-    it to a purpose-built analyzer."""
+    """The classify-and-split analyzer.
+
+    ``field_analyzer_id`` routes the prose and grid categories straight into
+    field extraction, so classification and extraction are one call instead of
+    one per segment. Drawings are deliberately not routed: they need native
+    resolution tiles the service will not produce, and plans are out of scope.
+    """
+    categories = {
+        name: ContentCategoryDefinition(
+            description=definition.description,
+            analyzer_id=field_analyzer_id if name in FIELD_ROUTED_CATEGORIES else None,
+        )
+        for name, definition in DOCUMENT_CATEGORIES.items()
+    }
     return ContentAnalyzer(
         base_analyzer_id="prebuilt-document",
         description="GoSelect Copilot router: classify and split a specification package",
@@ -127,7 +164,7 @@ def router_analyzer(
             # box around a tag reads as a radical sign - VFD-401 becomes \\sqrt{150-401}.
             enable_formula=False,
             estimate_field_source_and_confidence=True,
-            content_categories=DOCUMENT_CATEGORIES,
+            content_categories=categories,
         ),
         models={"completion": completion_model},
     )

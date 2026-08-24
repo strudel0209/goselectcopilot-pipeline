@@ -88,6 +88,53 @@ Verified live on 2026-08-24 against goselectRouterV2:
   start so it reads as the sheet's own title. This is what the `section_heading_f1` gate exists to
   catch; do not hand-patch it, label it.
 
+## Step 3 feasibility — PROVEN against the live service (2026-08-24)
+Converted `sample_docs/vfd_motor_schema_v1_0.json` (the agreed contract) into a CU
+`ContentFieldSchema` and created a throwaway analyzer `goselectSchemaProbe`:
+- **112 named fields, max nesting depth 6 — ACCEPTED, status READY, zero warnings.**
+- Round-tripped intact: `vfd_motor_pairs[].vfd.electrical.input_voltage.value` survived as
+  `{type: string, method: extract, description: ...}`.
+- So the docs' "table field = array of objects of *basic* fields" is not a hard limit.
+  `ContentFieldDefinition` is fully recursive in both specs (`items` and `properties` both
+  self-reference) with no maxDepth. Probe analyzer deleted afterwards.
+- `ContentFieldSchema.definitions` + per-field `$ref` exist - the contract repeats
+  `{value, unit, details}` about ten times, so define once and ref it.
+- Per-field `estimateSourceAndConfidence` overrides the analyzer-level flag.
+- **No union types.** ContentFieldType is one of string/date/time/number/integer/boolean/
+  array/object/json. The contract's `value: number|string|null` (e.g. "480/277") must become
+  `string`; parse in Python afterwards, which is the existing rule anyway.
+
+## Step 3 (option B: category-routed sub-analyzers) — IN PROGRESS
+Done so far:
+- `field_schema.py` converts the customer's JSON Schema into a `ContentFieldSchema`. The contract
+  file stays the source of truth, so a v1.1 is a file swap. Rules: unions collapse to string
+  (CU has no union types, and `480/277` must survive verbatim); every leaf is `extract`, never
+  `generate`, because a generated value has no place on a page.
+- `field_analyzer(schema)` + `router_analyzer(field_analyzer_id=...)`. Categories in
+  `FIELD_ROUTED_CATEGORIES = {text, schedule}` carry `analyzer_id`; drawing is deliberately NOT
+  routed (needs native-res tiles) and plan is out of scope.
+- `setup-analyzer` deploys the field analyzer FIRST - a category cannot reference an analyzer that
+  does not exist yet - then the router. Env: `CU_FIELD_ANALYZER_ID`, default `<router>Fields`.
+
+Verified live against goselectRouterV2 on 98624_1_VFDSchedule.pdf:
+- Routed response shape: `contents[0]` = router (markdown + segments, no fields),
+  `contents[1]` = sub-analyzer (`analyzer_id=...Fields`, `category='schedule'`, `fields=...`).
+  So the producer's `_first_document` still gets segmentation from contents[0]; the field entries
+  are additional and must be matched to segments by category/page.
+- Full 6-level contract extracted with per-field grounding, e.g.
+  `tag='VFD-AHU-1-RA-B' conf=0.517 src=D(1,3.0464,9.7583,...)`,
+  `product_name='ABB ACH 580' conf=0.697`, `notes='1,2,3,4' conf=0.864`.
+  This IS the provenance block the README says the contract lacks - served, not hand-plumbed.
+- **Confidences are low (0.52-0.70 on most fields).** Before this can run straight through, the
+  customer has to set a review threshold. At 0.25 (today's default) almost everything passes; at
+  0.8 almost everything goes to review. Needs labelled data to calibrate - do not guess it.
+- `poller.usage` returns real cost telemetry:
+  `{documentPagesStandard: 1, contextualizationTokens: 1000, tokens: {gpt-5.4-mini-input: 54865,
+  gpt-5.4-mini-output: 27981}}`. Wire this into ProducerCost instead of the flat per-page estimate.
+
+Still to do for step 3: map routed `fields` onto segments and into `ExtractionPayload`, then delete
+the per-type schemas and `expand()` for TEXT/SCHEDULE.
+
 ## Refactor plan (module verdicts)
 DELETE: segmentation.py (208), regions.py (140), geometry.py (62), models.py (150),
         layout.py + producers/di_layout.py (265), hand-rolled REST client in content_understanding.py (~200),

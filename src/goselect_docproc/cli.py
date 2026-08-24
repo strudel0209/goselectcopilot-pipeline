@@ -251,14 +251,30 @@ def cmd_bench(args: argparse.Namespace) -> int:
 
 
 def cmd_setup_analyzer(args: argparse.Namespace) -> int:
-    """One-off: create the Content Understanding router analyzer."""
-    from .producers.content_understanding import ensure_analyzer, router_analyzer
+    """One-off: create the router and the field analyzer it routes into."""
+    from .field_schema import count_fields, load_field_schema
+    from .producers.content_understanding import (
+        ensure_analyzer,
+        field_analyzer,
+        router_analyzer,
+    )
 
-    analyzer = router_analyzer(in_page_segments=args.in_page_segments)
     client = _content_understanding_client()
-    ensure_analyzer(client, args.analyzer_id, analyzer)
+    out = Path(args.out)
+
+    field_id = args.field_analyzer_id
+    if field_id:
+        # Before the router: a category cannot reference an analyzer that does not exist.
+        schema = load_field_schema(args.contract)
+        fields = field_analyzer(schema)
+        ensure_analyzer(client, field_id, fields)
+        print(f"analyzer {field_id} ready ({count_fields(schema)} named fields)")
+        _write(out, "cu-fields.json", fields.as_dict())
+
+    router = router_analyzer(in_page_segments=args.in_page_segments, field_analyzer_id=field_id)
+    ensure_analyzer(client, args.analyzer_id, router)
     print(f"analyzer {args.analyzer_id} ready")
-    _write(Path(args.out), "cu-router.json", analyzer.as_dict())
+    _write(out, "cu-router.json", router.as_dict())
     return 0
 
 
@@ -340,6 +356,14 @@ def main(argv: list[str] | None = None) -> int:
         "setup-analyzer", help="one-off: create the Content Understanding router analyzer"
     )
     p_setup.add_argument("--analyzer-id", default=os.getenv("CU_ANALYZER_ID", DEFAULT_ANALYZER_ID))
+    p_setup.add_argument(
+        "--field-analyzer-id",
+        default=os.getenv("CU_FIELD_ANALYZER_ID", f"{os.getenv('CU_ANALYZER_ID', DEFAULT_ANALYZER_ID)}Fields"),
+        help="analyzer the prose and grid categories route into; empty disables routing",
+    )
+    p_setup.add_argument(
+        "--contract", default=None, help="path to the agreed extraction contract JSON"
+    )
     p_setup.add_argument(
         "--in-page-segments",
         action="store_true",
