@@ -40,7 +40,8 @@ th{background:#eef1f4;font-weight:600}
 .ok{color:#1a7f37;font-weight:600} .bad{color:#cf222e;font-weight:600} .warn{color:#9a6700;font-weight:600}
 .pill{display:inline-block;padding:1px 8px;border-radius:10px;font-size:12px;font-weight:600}
 .TEXT{background:#ddf4ff;color:#0969da} .DRAWING{background:#fff1e5;color:#bc4c00}
-.SCHEDULE{background:#dafbe1;color:#1a7f37} .OTHER{background:#eee;color:#57606a}
+.SCHEDULE{background:#dafbe1;color:#1a7f37} .PLAN{background:#f3e9f7;color:#6b3b86}
+.OTHER{background:#eee;color:#57606a}
 code{background:#f0f2f4;padding:1px 5px;font-size:12px}
 .q{color:#57606a;font-style:italic}
 .big{font-size:26px;font-weight:700}

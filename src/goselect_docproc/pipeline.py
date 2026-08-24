@@ -95,7 +95,40 @@ class Pipeline:
                     coverage.unexplained_chars,
                     coverage.unexplained_samples[:2],
                 )
+        self._warn_on_collateral_drops(manifest)
         return manifest
+
+    def dropped_types(self) -> set[ContentType]:
+        from .extractors import DropExtractor
+
+        return {ct for ct, ex in self.extractors.items() if isinstance(ex, DropExtractor)}
+
+    def _warn_on_collateral_drops(self, manifest: Manifest) -> None:
+        """Policy drops an object, not a page. When a page-level classifier makes
+        the segment the whole page, the schedule printed beside the plan goes
+        with it - content loss by configuration, so it is reported not discovered.
+
+        A plan's own body is a figure and types as a DRAWING region; that is the
+        thing being dropped. Only prose and grids are collateral.
+        """
+        collateral_kinds = {ContentType.TEXT, ContentType.SCHEDULE}
+        dropped = self.dropped_types()
+        for segment in manifest.segments:
+            if segment.content_type not in dropped:
+                continue
+            collateral = sorted(
+                {r.kind.value for r in segment.regions if r.kind in collateral_kinds}
+            )
+            if collateral:
+                log.warning(
+                    "%s: dropping %s takes %s regions with it on pages %d-%d; "
+                    "enable in-page segmentation to keep them",
+                    segment.segment_id,
+                    segment.content_type.value,
+                    ",".join(collateral),
+                    segment.first_page,
+                    segment.last_page,
+                )
 
     # -- Enqueue ------------------------------------------------------------
 

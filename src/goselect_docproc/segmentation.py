@@ -133,6 +133,9 @@ class HeuristicClassifier:
     producer = HEURISTIC_PRODUCER
 
     def score(self, p: PageProfile) -> dict[str, float]:
+        # No PLAN score: a scaled layout and a one-line diagram are both bordered
+        # sheets of sparse rotated text, so geometry cannot separate them. Only a
+        # semantic classifier can, which is why this path routes plans to DRAWING.
         s = {"TEXT": 0.0, "SCHEDULE": 0.0, "DRAWING": 0.0, "OTHER": 0.25}
 
         # Drawings: large figure, landscape sheet, sparse rotated short tokens.

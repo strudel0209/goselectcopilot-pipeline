@@ -1,9 +1,8 @@
 """Azure OpenAI model client.
 
-One implementation of ``ModelClient`` per Foundry deployment. Deliberately built
-on the standard library rather than an SDK: the container this runs in has no
-route to PyPI, and the REST surface for chat completions is small enough that a
-dependency buys nothing.
+One implementation of ``ModelClient`` per Foundry deployment. Built on the
+standard library because the REST surface for chat completions is small enough
+that a dependency buys nothing.
 
 Auth is **Entra by default**. A key works, but the production recommendation is
 managed identity, so the default path is the one that gets tested.

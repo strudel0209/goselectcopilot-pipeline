@@ -8,7 +8,7 @@ region* instead of the *file*. Everything else in the surrounding cloud
 architecture stays as drawn.
 
 ```bash
-conda activate goselect
+source .venv/bin/activate
 python eval/report.py --producer=content-understanding spec.pdf oneline.pdf
 ```
 
@@ -478,15 +478,25 @@ supplied. **Every number in this document comes from four documents. Hand-label
 
 ## 8. Running it
 
+The devcontainer resolves every package through the Microsoft CFS proxy
+(`packagefeedproxy.microsoft.io`), because the public PyPI wheel CDN is not
+routable. `PIP_INDEX_URL` is set in `.devcontainer/devcontainer.json`, so pip
+needs no flags.
+
 ```bash
-conda env create -f environment.yml      # conda-forge only; PyPI may be blocked
-conda activate goselect
-pip install -e . --no-deps --no-build-isolation   # local, no network
+# The devcontainer does this for you on create; this is the manual equivalent.
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements-dev.txt
+pip install -e . --no-deps
+
 cp .env.example .env                     # fill in the two endpoints
 az login                                 # DefaultAzureCredential
 
 pytest -q                                # 102 tests, no cloud calls, no spend
 ```
+
+Dependencies live in `requirements.txt` (runtime) and `requirements-dev.txt`
+(tests, eval, notebooks). `pyproject.toml` reads them, so there is one list.
 
 | Command | Cost | Purpose |
 |---|---|---|

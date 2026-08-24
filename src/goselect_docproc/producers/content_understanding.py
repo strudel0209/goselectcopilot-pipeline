@@ -38,14 +38,20 @@ FURNITURE_ROLES = {"pageHeader", "pageFooter", "pageNumber"}
 API_VERSION = "2025-11-01"
 USD_PER_PAGE = 0.010
 
-# The service rejects '-' in an analyzer id, so keep this alphanumeric.
 DEFAULT_ANALYZER_ID = "goselectRouter"
 
+# The general "description properties" cap. The classifier page also quotes 120
+# characters for name + description, but neither API version encodes any length
+# constraint on ContentCategoryDefinition.description, and longer descriptions
+# are accepted in practice - so that figure is not treated as a gate here.
+MAX_DESCRIPTION_CHARS = 1024
+
 CATEGORY_TO_KIND: dict[str, ContentType] = {
-    "TextSpecification": ContentType.TEXT,
-    "EquipmentSchedule": ContentType.SCHEDULE,
-    "Drawing": ContentType.DRAWING,
-    "Other": ContentType.OTHER,
+    "text": ContentType.TEXT,
+    "schedule": ContentType.SCHEDULE,
+    "drawing": ContentType.DRAWING,
+    "plan": ContentType.PLAN,
+    "other": ContentType.OTHER,
 }
 
 ROUTER_ANALYZER: dict[str, Any] = {
@@ -58,32 +64,51 @@ ROUTER_ANALYZER: dict[str, Any] = {
         # box around a tag is read as a radical sign - VFD-401 becomes \sqrt{150-401}.
         "enableFormula": False,
         # Add "analyzerId" to a category to route it to a purpose-built analyzer.
+        # Categories describe what a human sees, not what the pipeline does with
+        # it. `drawing` and `plan` are the load-bearing split: both are sheets
+        # with a border and a title block, but only one carries connectivity.
         "contentCategories": {
-            "TextSpecification": {
+            "text": {
                 "description": (
-                    "Narrative technical specification prose: numbered sections and "
-                    "sub-sections, requirement clauses, scope of supply, standards "
-                    "references. Predominantly paragraphs, few or no tables, no drawing "
-                    "border or title block."
+                    "Prose and symbol keys: general notes, legends, abbreviation lists, "
+                    "specifications, method statements or correspondence. Mostly running "
+                    "text, not a table or a drawing."
                 )
             },
-            "EquipmentSchedule": {
+            "schedule": {
                 "description": (
-                    "Tabular equipment, motor, VFD or panel schedule. Page is dominated "
-                    "by one or more grids with column headers such as Tag, HP, kW, "
-                    "Voltage, FLA, Enclosure, Service."
+                    "Any tabular schedule or list with one row per item and repeating "
+                    "columns: equipment, starters, panels, cables, instruments, I/O "
+                    "points, parts lists, relay settings, datasheets or test records. "
+                    "Usually titled SCHEDULE, LIST or TABLE, and often printed on the "
+                    "same sheet as a drawing."
                 )
             },
-            "Drawing": {
+            "drawing": {
                 "description": (
-                    "Engineering drawing sheet: single-line diagram, P&ID, layout or "
-                    "elevation. Has a drawing border with a zone grid, a title block in "
-                    "the lower right, symbols connected by lines, and sparse rotated text."
+                    "A schematic drawing: symbols joined by lines to show how things "
+                    "connect, not where they physically are, and not to scale. Covers "
+                    "electrical one-line and single line diagrams, network and "
+                    "communications diagrams, and control or elementary ladder diagrams. "
+                    "The drawn body only - a tabular schedule on the same sheet is a "
+                    "schedule, not the drawing."
                 )
             },
-            # Without a catch-all, content is forced into one of the three above.
-            "Other": {
-                "description": "Cover pages, transmittals, blank pages, revision histories."
+            "plan": {
+                "description": (
+                    "A scaled view of physical space or hardware, with dimensions: site "
+                    "and building plans, equipment layouts, routing and grounding plans, "
+                    "and construction details such as sections, elevations and profile "
+                    "views. Shows where things physically are and how they are built, "
+                    "not how they connect."
+                )
+            },
+            # Without a catch-all, content is forced into one of the categories above.
+            "other": {
+                "description": (
+                    "Content that matches none of the other categories, including "
+                    "blank pages."
+                )
             },
         },
     },

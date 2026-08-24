@@ -355,9 +355,37 @@ class NullModel:
         return self.canned
 
 
+@dataclass
+class DropExtractor:
+    """Out of scope by customer policy: segmented and coverage-proved, then not
+    sent to a model. Dropping by *omitting* an extractor would work too, but it
+    leaves no trace in the result, and silent exclusion is indistinguishable
+    from a routing bug."""
+
+    content_type: ContentType
+    reason: str
+
+    def extract(self, context: SegmentContext) -> ExtractionPayload:
+        return ExtractionPayload(
+            notes=[f"{self.content_type.value} {context.item.segment_id} not extracted: {self.reason}"]
+        )
+
+
+# A scaled layout shows where equipment sits, never which drive feeds which
+# motor, so it cannot contribute a pairing - and its dimension strings read as
+# plausible tags. The customer excluded plan sheets from scope.
+DROP_REASONS: dict[ContentType, str] = {
+    ContentType.PLAN: "plan sheets are excluded from scope; scaled layout carries no drive-motor topology",
+}
+
+
 def default_extractors(model: ModelClient, limits: VisionLimits | None = None) -> dict[ContentType, Extractor]:
     limits = limits or VisionLimits.high_resolution()
-    return {
+    extractors: dict[ContentType, Extractor] = {
         ct: ModelExtractor(content_type=ct, model=model, vision_limits=limits)
         for ct in (ContentType.TEXT, ContentType.SCHEDULE, ContentType.DRAWING)
     }
+    extractors.update(
+        {ct: DropExtractor(content_type=ct, reason=reason) for ct, reason in DROP_REASONS.items()}
+    )
+    return extractors

@@ -14,7 +14,12 @@ import pytest
 from goselect_docproc.contracts import ContentType
 from goselect_docproc.producers import available
 from goselect_docproc.producers.base import ProducerCapabilities, ProducerCost
-from goselect_docproc.producers.content_understanding import ContentUnderstandingProducer
+from goselect_docproc.producers.content_understanding import (
+    CATEGORY_TO_KIND,
+    MAX_DESCRIPTION_CHARS,
+    ROUTER_ANALYZER,
+    ContentUnderstandingProducer,
+)
 from goselect_docproc.producers.di_layout import DILayoutProducer
 from goselect_docproc.spans import overlaps
 
@@ -84,9 +89,9 @@ class TestContentUnderstanding:
             "figures": [{"id": "2.1", "span": {"offset": 59, "length": 21}}],
             "segments": [
                 {"segmentId": "s1", "span": {"offset": 0, "length": 40},
-                 "startPageNumber": 1, "endPageNumber": 1, "category": "TextSpecification"},
+                 "startPageNumber": 1, "endPageNumber": 1, "category": "text"},
                 {"segmentId": "s2", "span": {"offset": 40, "length": 46},
-                 "startPageNumber": 2, "endPageNumber": 2, "category": "Drawing"},
+                 "startPageNumber": 2, "endPageNumber": 2, "category": "drawing"},
             ],
         }
         return ContentUnderstandingProducer(FakeCU({"contents": [item]}))
@@ -165,10 +170,10 @@ class TestRouterAnalyzerDefinition:
         assert ROUTER_ANALYZER["models"]["completion"]
 
     def test_catch_all_category_exists(self):
-        """Without it, content is forced into one of the three real categories."""
+        """Without it, content is forced into one of the real categories."""
         from goselect_docproc.producers.content_understanding import ROUTER_ANALYZER
 
-        assert "Other" in ROUTER_ANALYZER["config"]["contentCategories"]
+        assert "other" in ROUTER_ANALYZER["config"]["contentCategories"]
 
     def test_every_category_has_a_description(self):
         from goselect_docproc.producers.content_understanding import ROUTER_ANALYZER
@@ -176,6 +181,29 @@ class TestRouterAnalyzerDefinition:
         categories = ROUTER_ANALYZER["config"]["contentCategories"]
         assert all(c.get("description") for c in categories.values())
         assert len(categories) <= 200
+
+    @pytest.mark.parametrize("name", sorted(CATEGORY_TO_KIND))
+    def test_category_description_fits_the_service_limit(self, name):
+        description = ROUTER_ANALYZER["config"]["contentCategories"][name]["description"]
+        assert len(description) <= MAX_DESCRIPTION_CHARS
+
+    def test_declared_categories_and_routing_table_agree(self):
+        """A category the service can return but the map has no entry for is
+        silently downgraded to OTHER, which looks like a classifier failure."""
+        assert set(ROUTER_ANALYZER["config"]["contentCategories"]) == set(CATEGORY_TO_KIND)
+
+    def test_plan_is_a_category_of_its_own(self):
+        """Plans are dropped, so they must be separable from drawings first."""
+        assert CATEGORY_TO_KIND["plan"] is ContentType.PLAN
+        assert CATEGORY_TO_KIND["drawing"] is ContentType.DRAWING
+
+    @pytest.mark.parametrize("name", sorted(CATEGORY_TO_KIND))
+    def test_category_description_fits_the_service_limit(self, name):
+        description = ROUTER_ANALYZER["config"]["contentCategories"][name]["description"]
+        assert len(description) <= MAX_DESCRIPTION_CHARS
+
+    def test_every_routed_category_is_defined(self):
+        assert set(ROUTER_ANALYZER["config"]["contentCategories"]) == set(CATEGORY_TO_KIND)
 
 
 class TestRegistryAndCost:

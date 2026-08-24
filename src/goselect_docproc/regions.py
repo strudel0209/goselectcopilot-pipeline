@@ -27,6 +27,7 @@ FURNITURE_ROLES = {"pageHeader", "pageFooter", "pageNumber"}
 
 CLAIM_ORDER: dict[ContentType, tuple[str, ...]] = {
     ContentType.DRAWING: ("figure", "table"),
+    ContentType.PLAN: ("figure", "table"),
     ContentType.SCHEDULE: ("table", "figure"),
     ContentType.TEXT: ("table", "figure"),
     ContentType.OTHER: ("table", "figure"),

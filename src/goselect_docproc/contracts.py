@@ -37,6 +37,9 @@ class ContentType(StrEnum):
     TEXT = "TEXT"
     SCHEDULE = "SCHEDULE"
     DRAWING = "DRAWING"
+    # Scaled layouts. Separated from DRAWING so they can be excluded by policy
+    # rather than fed to a vision model that will read dimensions as equipment.
+    PLAN = "PLAN"
     OTHER = "OTHER"
 
 

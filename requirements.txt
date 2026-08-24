@@ -1,0 +1,23 @@
+# Runtime dependencies — the single source of truth. pyproject.toml reads this
+# file, so add a package here and nowhere else.
+#
+# Resolved through the Microsoft CFS proxy (PIP_INDEX_URL is set in
+# .devcontainer/devcontainer.json). The public PyPI wheel CDN
+# (files.pythonhosted.org) is not routable from this network.
+
+# Content Understanding. Pinned to the beta because the GA line (1.1.0) speaks
+# api-version 2025-11-01 and has none of the 2026-06-01-preview surface:
+# allow_in_page_segments, agentic workflow, semantic chunking, inline analyze.
+azure-ai-contentunderstanding==1.2.0b3
+
+azure-ai-documentintelligence>=1.0.2
+azure-identity>=1.19.0
+
+pydantic>=2.7
+python-dotenv>=1.0.1
+rapidfuzz>=3.9.0
+
+# Drawing extraction is not optional: render.py rasterises the source PDF
+# because no service returns legible figure bytes for an E-size sheet.
+pymupdf>=1.24.0
+pillow>=10.3.0
