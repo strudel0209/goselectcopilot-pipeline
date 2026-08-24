@@ -1,5 +1,16 @@
 # GoSelect docproc — CU refactor plan + verified facts (Aug 2026)
 
+**Read this first after a devcontainer rebuild.** Chat history lives in `~/.vscode-server` inside
+the container and does not survive one; this file does. Steps 1-3 are done and pushed. Step 4 is
+next. Every fact below was verified against the live service or the OpenAPI spec on 2026-08-24 —
+where a claim came from docs prose and turned out wrong, that is called out, so do not "correct"
+them back.
+
+Working env after a successful rebuild: no conda, `.venv/bin/python`, packages via the CFS proxy
+(`PIP_INDEX_URL` is set in devcontainer.json). Run tests with `.venv/bin/python -m pytest -q`
+(150 passing). The CLI is `goselect-docproc`, or `python -m goselect_docproc.cli` with
+`PYTHONPATH=src`. `segment` costs one Content Understanding call per page and no model spend.
+
 ## Environment (migration DONE, needs container rebuild to take effect)
 - conda removed. `environment.yml` deleted. Image now `mcr.microsoft.com/devcontainers/python:1-3.12-bookworm`.
 - Packages resolve via Microsoft CFS proxy (public PyPI CDN not routable):
@@ -182,10 +193,15 @@ Net: ~1,400-1,600 of ~3,850 src lines removable (~40%).
    now `content-understanding-sections` (tree) -> `-sections-flat` (bare root, emit nothing) ->
    `-roles` (flat fallback). Also fixed: PLAN was inheriting prose clauses because the rule said
    `is not DRAWING`; now `not in SELF_TITLING = {DRAWING, PLAN}`.
-3. Lift vfd_motor_schema_v1_0.json into a CU field_schema + estimate_field_source_and_confidence;
-   delete per-type schemas and expand()                   [NO preview needed]  <- NEXT
-4. Bench allow_in_page_segments vs regions.py on Package A via eval/score.py  [preview]
+3. ~~Lift vfd_motor_schema_v1_0.json into a CU field_schema + estimate_field_source_and_confidence~~
+   DONE via option B (category-routed sub-analyzers). See "Step 3 mapping" above. Per-type schemas
+   and `expand()` are still present because DRAWING still uses them; they only disappear if the
+   drawing branch ever stops calling a model directly, which step 6 tests.
+4. Bench allow_in_page_segments vs regions.py on Package A via eval/score.py  [preview]  <- NEXT
+   Success metric already wired: `Pipeline._warn_on_collateral_drops` count should fall to zero,
+   because a schedule sharing a plan sheet stops being dropped with it.
 5. Delete segmentation/regions/geometry/layout/di_layout if 4 holds           [preview]
+   Do this one as a PR, not a direct commit: ~800 lines and it ends the bench-off permanently.
 6. Agentic control arm on Package B drawings vs the tiling path               [preview]
 
 ## Gotchas hit
