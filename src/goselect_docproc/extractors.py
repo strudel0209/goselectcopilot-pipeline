@@ -52,6 +52,8 @@ class SegmentContext:
     section_index: SectionIndex | None = None
     figures: dict[str, bytes] = field(default_factory=dict)
     lexicon: TagLexicon | None = None
+    fields: Any = None
+    """Contract fields the producer already extracted for this segment, if any."""
 
     @property
     def spans(self) -> list[tuple[int, int]]:
@@ -355,6 +357,191 @@ class NullModel:
         return self.canned
 
 
+# ---------------------------------------------------------------------------
+# contract fields -> domain payload
+# ---------------------------------------------------------------------------
+
+# Duck-typed on purpose: a Content Understanding ContentField exposes value,
+# value_object, value_array, source, confidence and spans. Keeping this module
+# free of the SDK import means the same code maps any producer that can supply
+# the agreed contract shape.
+
+
+def _obj(node: Any) -> dict[str, Any]:
+    return getattr(node, "value_object", None) or {}
+
+
+def _text(node: Any) -> str | None:
+    if node is None:
+        return None
+    value = getattr(node, "value", None)
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def parse_source(source: str | None) -> tuple[int | None, list[float] | None]:
+    """``D(page,x1,y1,...,x4,y4)`` -> page and polygon. Multi-region sources are
+    separated by ``;``; the first region is the one a reviewer is sent to."""
+    if not source:
+        return None, None
+    first = source.split(";")[0].strip()
+    if not first.startswith("D(") or not first.endswith(")"):
+        return None, None
+    parts = [p.strip() for p in first[2:-1].split(",") if p.strip()]
+    if not parts:
+        return None, None
+    try:
+        page = int(float(parts[0]))
+        coordinates = [float(p) for p in parts[1:]]
+    except ValueError:
+        return None, None
+    return page, coordinates if len(coordinates) >= 8 else None
+
+
+def _evidence(node: Any, context: SegmentContext, source: str) -> Evidence:
+    page, polygon = parse_source(getattr(node, "source", None))
+    spans = [
+        Span(offset=int(s.offset or 0), length=int(s.length or 0))
+        for s in (getattr(node, "spans", None) or [])
+    ]
+    return Evidence(
+        file_id=context.item.file_id,
+        page=page or context.item.first_page,
+        spans=spans or list(context.item.spans),
+        polygon=polygon,
+        section_path=context.item.section_root,
+        verbatim=_text(node),
+        source=source,  # type: ignore[arg-type]
+        confidence=getattr(node, "confidence", None),
+    )
+
+
+def _quantity(node: Any) -> Quantity:
+    """The contract wraps every measurement as ``{value, unit, details}``."""
+    body = _obj(node)
+    raw = _text(body.get("value"))
+    unit = _text(body.get("unit"))
+    if raw is None:
+        return Quantity()
+    parsed = parse_quantity(f"{raw} {unit}" if unit else raw)
+    return Quantity(value=parsed.value, unit=unit or parsed.unit, raw=raw)
+
+
+def _valued(node: Any) -> str | None:
+    """``{value, reference, details}`` groups such as enclosure_rating."""
+    return _text(_obj(node).get("value"))
+
+
+def expand_contract(
+    fields: Any, context: SegmentContext, origin: ContentType
+) -> ExtractionPayload:
+    """Contract-shaped service output -> domain payload.
+
+    The service returns the agreed schema; this only reshapes it and never
+    reinterprets a value. Units and arithmetic stay in ``parse_quantity``.
+    """
+    payload = ExtractionPayload()
+    pairs = fields.get("vfd_motor_pairs") if hasattr(fields, "get") else None
+    for index, entry in enumerate(getattr(pairs, "value_array", None) or []):
+        body = _obj(entry)
+        tag_node = body.get("tag")
+        tag = _text(tag_node)
+        if tag and context.lexicon:
+            repair = context.lexicon.snap(tag)
+            if repair.method == "ambiguous":
+                payload.notes.append(
+                    f"tag {tag!r} ambiguous between {list(repair.ambiguous_with)}"
+                )
+            tag = repair.value
+
+        source = "table" if origin is ContentType.SCHEDULE else "text"
+        evidence = _evidence(tag_node or entry, context, source)
+
+        vfd = _obj(body.get("vfd"))
+        motor = _obj(body.get("motor"))
+        vfd_power = _obj(vfd.get("electrical"))
+        motor_power = _obj(motor.get("electrical"))
+
+        if vfd:
+            payload.vfds.append(
+                VfdSpec(
+                    tag=tag,
+                    power=_quantity(vfd_power.get("power_rating")),
+                    voltage=_quantity(vfd_power.get("input_voltage")),
+                    current=_quantity(vfd_power.get("output_current")),
+                    enclosure=_valued(vfd.get("enclosure_rating")),
+                    filter=_valued(vfd.get("harmonic_mitigation")),
+                    evidence=[evidence],
+                )
+            )
+        if motor:
+            payload.motors.append(
+                MotorSpec(
+                    tag=tag,
+                    power=_quantity(motor_power.get("power_rating")),
+                    voltage=_quantity(motor_power.get("voltage")),
+                    frequency=_quantity(motor_power.get("frequency")),
+                    speed=_quantity(motor_power.get("speed")),
+                    frame_size=_text(motor.get("frame_size")),
+                    evidence=[evidence],
+                )
+            )
+        # The contract keys a pair on one tag and gives the motor no identifier of
+        # its own, so the pairing is one-sided. Only a grid asserts a relationship;
+        # prose states requirements.
+        if tag and vfd and motor and origin is ContentType.SCHEDULE:
+            payload.pairs.append(
+                Pair(
+                    pair_id=f"{context.item.segment_id}-p{index}",
+                    vfd_tag=tag,
+                    motor_tag=None,
+                    origin=origin,
+                    confidence=float(getattr(tag_node, "confidence", None) or 0.0),
+                    evidence=[evidence],
+                )
+            )
+
+        for note in (_text(body.get("notes")), _text(body.get("location"))):
+            if note:
+                payload.notes.append(note)
+
+    if payload.pairs:
+        payload.notes.append(
+            f"{len(payload.pairs)} pairs are one-sided: the agreed contract has no motor tag "
+            "field, so a motor is identified only by the pair it belongs to"
+        )
+    return payload
+
+
+@dataclass
+class RoutedFieldExtractor:
+    """Uses fields the producer already extracted, or falls back to a model.
+
+    Content Understanding can classify and extract in one call, so a routed
+    segment arrives already extracted. A producer that cannot do that leaves
+    ``context.fields`` empty and the fallback runs, which is what keeps the two
+    engines comparable on the same corpus.
+    """
+
+    content_type: ContentType
+    fallback: Extractor | None = None
+
+    @property
+    def model(self) -> Any:
+        return getattr(self.fallback, "model", None)
+
+    def extract(self, context: SegmentContext) -> ExtractionPayload:
+        if context.fields:
+            return expand_contract(context.fields, context, self.content_type)
+        if self.fallback is not None:
+            return self.fallback.extract(context)
+        return ExtractionPayload(
+            notes=[f"{self.content_type.value} {context.item.segment_id}: no fields returned"]
+        )
+
+
 @dataclass
 class DropExtractor:
     """Out of scope by customer policy: segmented and coverage-proved, then not
@@ -385,6 +572,10 @@ def default_extractors(model: ModelClient, limits: VisionLimits | None = None) -
         ct: ModelExtractor(content_type=ct, model=model, vision_limits=limits)
         for ct in (ContentType.TEXT, ContentType.SCHEDULE, ContentType.DRAWING)
     }
+    # Prose and grids are routed to the service's own field extraction when the
+    # producer supports it; the model call is the fallback, not the default.
+    for ct in (ContentType.TEXT, ContentType.SCHEDULE):
+        extractors[ct] = RoutedFieldExtractor(content_type=ct, fallback=extractors[ct])
     extractors.update(
         {ct: DropExtractor(content_type=ct, reason=reason) for ct, reason in DROP_REASONS.items()}
     )

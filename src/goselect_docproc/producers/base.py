@@ -67,6 +67,9 @@ class DocumentAnalysis:
     source_uri: str = ""
     cost: ProducerCost = field(default_factory=ProducerCost)
     figure_ids_by_segment: dict[str, list[str]] = field(default_factory=dict)
+    fields_by_segment: dict[str, Any] = field(default_factory=dict)
+    """Fields the producer already extracted, keyed by segment id. Empty unless
+    the producer routes categories to a field analyzer."""
     furniture_spans: list[Span] = field(default_factory=list)
     native: Any = None
     warnings: list[str] = field(default_factory=list)

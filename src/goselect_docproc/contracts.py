@@ -87,6 +87,9 @@ class Evidence(Strict):
     section_path: str | None = None
     verbatim: str | None = None
     source: Literal["text", "table", "figure", "derived"] = "text"
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    """Service-estimated, per value. The other half of grounding: where it came
+    from, and how sure the extractor was."""
 
     @property
     def start(self) -> int:

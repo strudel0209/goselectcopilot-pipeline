@@ -186,6 +186,7 @@ class Pipeline:
             section_index=analysis.section_index,
             figures=figures,
             lexicon=lexicon,
+            fields=analysis.fields_by_segment.get(item.segment_id),
         )
 
         started = time.perf_counter()

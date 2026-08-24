@@ -234,7 +234,11 @@ def merge(
     review += [c.field for c in conflicts]
 
     status = Status.DONE if done == expected and not failed else Status.REVIEW
-    if done == 0:
+    # FAILED means nothing usable came back. A segment held for review still
+    # carries its payload, so a package that is entirely under review is not a
+    # failed job - the default posture is partial, flagged, held.
+    terminal = {r.segment_id: r for r in ordered if r.status.terminal}
+    if not any(r.status is not Status.FAILED for r in terminal.values()):
         status = Status.FAILED
 
     return JobResult(

@@ -135,6 +135,30 @@ Verified live against goselectRouterV2 on 98624_1_VFDSchedule.pdf:
 Still to do for step 3: map routed `fields` onto segments and into `ExtractionPayload`, then delete
 the per-type schemas and `expand()` for TEXT/SCHEDULE.
 
+### Step 3 mapping — DONE
+`expand_contract()` in extractors.py maps contract-shaped service output onto the domain payload,
+duck-typed (value/value_object/value_array/source/confidence/spans) so extractors.py takes no SDK
+import. `RoutedFieldExtractor` uses routed fields when present and falls back to the model call
+otherwise, which is what keeps DI and CU comparable on the same corpus. `parse_source()` turns
+`D(page,x1,y1,...)` into page + polygon; `Evidence` gained an optional `confidence`.
+
+Live on 98624_1_VFDSchedule.pdf: **42 VFDs, 42 motors, 42 pairs, job DONE 1/1, ZERO model calls**,
+every record carrying page, polygon and confidence.
+
+Two bugs this run exposed, both fixed:
+- `assemble.merge` marked a job FAILED whenever `done == 0`, which made a single-segment package
+  whose one segment was held for review look like a total failure despite carrying 42 grounded
+  records. FAILED now means nothing non-FAILED reached a terminal state.
+- **The agreed contract has no motor tag field.** `tag` identifies the pair. Emitting
+  `Pair(vfd_tag=tag, motor_tag=tag)` tripped the "drive and motor share tag" validation, which
+  exists to catch a real error class. Pairs from the contract are now one-sided
+  (`motor_tag=None`) with a note saying so. **This is a customer decision:** a one-sided pair can
+  never match a two-tag answer key, so `pair_f1` cannot be scored on schedule-derived pairs until
+  the contract gains a motor tag. Raise it alongside the merge-precedence sign-off.
+- Electrical values came back null on that schedule. The mapping is unit-tested against
+  `{value, unit, details}` (75 kW -> value=75.0 unit='kW' raw='75'), so this is the source document
+  or the extraction, not the mapping. Confirm against a schedule that has rating columns.
+
 ## Refactor plan (module verdicts)
 DELETE: segmentation.py (208), regions.py (140), geometry.py (62), models.py (150),
         layout.py + producers/di_layout.py (265), hand-rolled REST client in content_understanding.py (~200),

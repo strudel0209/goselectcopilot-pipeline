@@ -218,7 +218,8 @@ class ContentUnderstandingProducer:
         self.usd_per_page = usd_per_page
 
     def analyze(self, file_id: str, data: bytes, source_uri: str | None = None) -> DocumentAnalysis:
-        item = _first_document(self._call(data, source_uri))
+        response = self._call(data, source_uri)
+        item = _first_document(response)
         if item is None:
             raise RuntimeError("content understanding returned no document content")
 
@@ -227,9 +228,10 @@ class ContentUnderstandingProducer:
         page_of = _page_lookup(pages)
 
         claims = _classify_elements(item, page_of)
+        blocks = list(item.segments or [])
         segments = [
             self._segment(file_id, index, block, claims)
-            for index, block in enumerate(item.segments or [], start=1)
+            for index, block in enumerate(blocks, start=1)
         ]
 
         index_ = _section_index_from(item, page_of)
@@ -252,6 +254,8 @@ class ContentUnderstandingProducer:
                 api_calls=1,
                 usd_estimate=round(page_count * self.usd_per_page, 6),
             ),
+            figure_ids_by_segment={},
+            fields_by_segment=_fields_by_segment(response, item, blocks, segments),
             furniture_spans=[Span(offset=o, length=l) for o, l, _, kind in claims if kind is None],
             native=item,
         )
@@ -315,6 +319,46 @@ def _first_document(response: AnalysisResult) -> DocumentContent | None:
         if getattr(content, "markdown", None) is not None:
             return content  # type: ignore[return-value]
     return None
+
+
+def _fields_by_segment(
+    response: AnalysisResult,
+    router_content: DocumentContent,
+    blocks: list[Any],
+    segments: list[Segment],
+) -> dict[str, Any]:
+    """Category routing returns the router's own content plus one extra entry per
+    routed segment. Match those back by the service's own segment id, falling
+    back to the page range when a routed entry reports no segments.
+    """
+    by_native = {
+        block.segment_id: segment.segment_id
+        for block, segment in zip(blocks, segments)
+        if block.segment_id
+    }
+    by_pages = {(s.first_page, s.last_page): s.segment_id for s in segments}
+
+    out: dict[str, Any] = {}
+    for content in response.contents or []:
+        fields = getattr(content, "fields", None)
+        if content is router_content or not fields:
+            continue
+        owner = None
+        for block in getattr(content, "segments", None) or []:
+            owner = by_native.get(block.segment_id)
+            if owner:
+                break
+        if owner is None:
+            owner = by_pages.get((content.start_page_number, content.end_page_number))
+        if owner:
+            out[owner] = fields
+        else:
+            log.warning(
+                "routed fields on pages %s-%s match no segment; they will be dropped",
+                content.start_page_number,
+                content.end_page_number,
+            )
+    return out
 
 
 def _page_lookup(pages: list[Any]) -> list[tuple[int, int, int]]:
