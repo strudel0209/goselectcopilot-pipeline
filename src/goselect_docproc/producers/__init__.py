@@ -1,8 +1,7 @@
 """Swappable segment producers.
 
-The spine is producer independent. Choose by measurement, not by argument:
-
-    goselect-docproc bench --producers di-layout,content-understanding corpus/*.pdf
+The spine is producer independent: a producer reduces a service's native model
+to the neutral shapes in ``base``, and nothing downstream knows which one ran.
 """
 
 from .base import (
@@ -15,11 +14,9 @@ from .base import (
     register,
 )
 from .content_understanding import ContentUnderstandingProducer, router_analyzer
-from .di_layout import DILayoutProducer
 
 __all__ = [
     "ContentUnderstandingProducer",
-    "DILayoutProducer",
     "DocumentAnalysis",
     "ProducerCapabilities",
     "ProducerCost",

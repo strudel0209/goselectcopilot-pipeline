@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+from collections.abc import Mapping
 from typing import Any, Protocol, runtime_checkable
 
 from azure.ai.contentunderstanding.models import (
@@ -133,23 +134,38 @@ def field_analyzer(
     )
 
 
+def schedule_analyzer(completion_model: str = DEFAULT_COMPLETION_MODEL) -> ContentAnalyzer:
+    from ..field_schema import schedule_schema
+
+    return field_analyzer(schedule_schema(), completion_model)
+
+
+def text_analyzer(completion_model: str = DEFAULT_COMPLETION_MODEL) -> ContentAnalyzer:
+    from ..field_schema import text_schema
+
+    return field_analyzer(text_schema(), completion_model)
+
+
 def router_analyzer(
     completion_model: str = DEFAULT_COMPLETION_MODEL,
     *,
     in_page_segments: bool = False,
-    field_analyzer_id: str | None = None,
+    field_analyzer_ids: Mapping[str, str] | None = None,
 ) -> ContentAnalyzer:
     """The classify-and-split analyzer.
 
-    ``field_analyzer_id`` routes the prose and grid categories straight into
-    field extraction, so classification and extraction are one call instead of
-    one per segment. Drawings are deliberately not routed: they need native
-    resolution tiles the service will not produce, and plans are out of scope.
+    ``field_analyzer_ids`` maps a category to its own sub-analyzer, so prose and
+    grids are extracted against different schemas in the same call. One shared
+    schema does not work: the full contract is 112 fields, and asking for all of
+    them per row truncates the document before the motor block is reached.
+    Drawings are deliberately not routed - they need native resolution tiles the
+    service will not produce - and plans are out of scope.
     """
+    routes = field_analyzer_ids or {}
     categories = {
         name: ContentCategoryDefinition(
             description=definition.description,
-            analyzer_id=field_analyzer_id if name in FIELD_ROUTED_CATEGORIES else None,
+            analyzer_id=routes.get(name),
         )
         for name, definition in DOCUMENT_CATEGORIES.items()
     }

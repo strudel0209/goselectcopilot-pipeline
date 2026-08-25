@@ -61,7 +61,8 @@ def main() -> int:
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     flags = [a for a in sys.argv[1:] if a.startswith("--")]
     producer_name = next(
-        (f.split("=", 1)[1] for f in flags if f.startswith("--producer=")), "di-layout"
+        (f.split("=", 1)[1] for f in flags if f.startswith("--producer=")),
+        "content-understanding",
     )
     pdfs = args or ["sample_docs/98878_1_HoweyVFDs.pdf", "sample_docs/98878_2_HoweyOneline.pdf"]
     text_model = os.getenv("REPORT_MODEL", "gpt-5.4-mini")
@@ -75,9 +76,9 @@ def main() -> int:
 
     started = time.perf_counter()
     pipeline = Pipeline(
-        producer=_producer(producer_name, Path(".cache")),
+        producer=_producer(producer_name),
         extractors=extractors,
-        config=PipelineConfig(cache_dir=Path(".cache"), output_dir=Path("out")),
+        config=PipelineConfig(output_dir=Path("out")),
     )
     manifest, job, results = pipeline.run(_sources(pdfs))
     elapsed = time.perf_counter() - started

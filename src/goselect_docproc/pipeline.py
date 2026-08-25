@@ -50,6 +50,14 @@ log = logging.getLogger(__name__)
 @dataclass
 class PipelineConfig:
     review_threshold: float = 0.25
+    # Per FIELD, not per pair. Measured on the 42-row Plainville schedule
+    # (n=3,192): values copied from a cell land at 0.92-0.97, values the service
+    # had to infer - location, application, enclosure rating, tag - land at
+    # 0.33-0.72. Only 3.7% of fields fall between, so the exact line barely
+    # matters; 0.80 sits in that empty band and separates read from inferred.
+    # It must stay field-level: every tag on that schedule scores below 0.72, so
+    # a pair-level rule would send 42/42 pairs to review and buy nothing.
+    field_review_threshold: float = 0.80
     max_workers: int = 4
     max_attempts: int = 3
     require_grounding: bool = True
@@ -57,7 +65,6 @@ class PipelineConfig:
     # correctly in 24 tiles; 150 dpi reads the same tags but needs 48, over the
     # 40-tile cost guard. DI's own crop of that sheet is 1477x934 and reads VD-401.
     drawing_dpi: int = 100
-    cache_dir: Path = Path(".cache")
     output_dir: Path = Path("out")
 
 

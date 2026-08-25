@@ -202,7 +202,7 @@ class Manifest(Strict):
     segments: list[Segment]
     section_index: list[SectionNode] = Field(default_factory=list)
     coverage: dict[str, Coverage] = Field(default_factory=dict)
-    producer: str = "di-layout-heuristic-v1"
+    producer: str = "content-understanding"
 
     @property
     def expected_units(self) -> int:
@@ -352,6 +352,13 @@ class ExtractionPayload(Strict):
     applications: list[ApplicationSpec] = Field(default_factory=list)
     pairs: list[Pair] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
+    contract_rows: list[dict] = Field(default_factory=list)
+    """The service's own contract-shaped rows, unwrapped but not reinterpreted.
+
+    The domain models above are deliberately narrow - they carry only what the
+    reconciliation logic needs. Rebuilding the agreed schema from them would
+    silently drop every field the logic does not use, so the deliverable is
+    built from these instead."""
 
 
 class Conflict(Strict):

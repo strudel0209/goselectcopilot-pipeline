@@ -5,7 +5,7 @@
     goselect-docproc run      <pdf>...   # full pipeline
     goselect-docproc tiles    <w> <h>    # vision legibility budget for a drawing
 
-``segment`` and ``plan`` cost one Layout call per file and nothing else, so they
+``segment`` and ``plan`` cost one analyze call per file and nothing else, so they
 are safe to run repeatedly while tuning.
 """
 
@@ -20,44 +20,20 @@ from pathlib import Path
 
 from .contracts import ContentType
 from .extractors import ModelExtractor, NullModel, default_extractors
-from .layout import LayoutClient
 from .pipeline import Pipeline, PipelineConfig
 from .producers import available as available_producers
 from .producers.content_understanding import DEFAULT_ANALYZER_ID
 from .tiling import VisionLimits, assess, plan_tiles
 
 
-def _layout_client(cache_dir: Path) -> LayoutClient:
-    endpoint = os.getenv("DOCUMENTINTELLIGENCE_ENDPOINT")
-    if not endpoint:
-        # Fully cached corpora replay with no credentials, which is what makes the
-        # eval set runnable in CI.
-        logging.getLogger(__name__).warning(
-            "DOCUMENTINTELLIGENCE_ENDPOINT unset; cache-only mode"
-        )
-        return LayoutClient(None, cache_dir)
-
-    from azure.ai.documentintelligence import DocumentIntelligenceClient
-    from azure.core.credentials import AzureKeyCredential
-    from azure.identity import DefaultAzureCredential
-
-    key = os.getenv("DOCUMENTINTELLIGENCE_API_KEY")
-    credential = AzureKeyCredential(key) if key else DefaultAzureCredential()
-    return LayoutClient(
-        DocumentIntelligenceClient(endpoint=endpoint, credential=credential), cache_dir
-    )
-
-
-def _producer(name: str, cache_dir: Path):
+def _producer(name: str):
     """Swap the front half by configuration. The spine never changes."""
-    from .producers import ContentUnderstandingProducer, DILayoutProducer
-
-    if name == "di-layout":
-        return DILayoutProducer(_layout_client(cache_dir))
+    from .producers import ContentUnderstandingProducer
 
     if name == "content-understanding":
         return ContentUnderstandingProducer(
-            _content_understanding_client(), analyzer_id=os.getenv("CU_ANALYZER_ID", DEFAULT_ANALYZER_ID)
+            _content_understanding_client(),
+            analyzer_id=os.getenv("CU_ANALYZER_ID", DEFAULT_ANALYZER_ID),
         )
 
     raise SystemExit(f"unknown producer {name!r}; available: {available_producers()}")
@@ -127,9 +103,9 @@ def _report_segments(manifest, threshold: float) -> None:
 
 def cmd_segment(args: argparse.Namespace) -> int:
     pipeline = Pipeline(
-        producer=_producer(args.producer, Path(args.cache_dir)),
+        producer=_producer(args.producer),
         extractors={},
-        config=PipelineConfig(cache_dir=Path(args.cache_dir), output_dir=Path(args.out)),
+        config=PipelineConfig(output_dir=Path(args.out)),
     )
     manifest = pipeline.segment(_sources(args.pdf))
     _report_segments(manifest, args.review_threshold)
@@ -141,9 +117,9 @@ def cmd_segment(args: argparse.Namespace) -> int:
 
 def cmd_plan(args: argparse.Namespace) -> int:
     pipeline = Pipeline(
-        producer=_producer(args.producer, Path(args.cache_dir)),
+        producer=_producer(args.producer),
         extractors={},
-        config=PipelineConfig(cache_dir=Path(args.cache_dir), output_dir=Path(args.out)),
+        config=PipelineConfig(output_dir=Path(args.out)),
     )
     manifest = pipeline.segment(_sources(args.pdf))
     items = pipeline.plan(manifest)
@@ -192,10 +168,9 @@ def cmd_run(args: argparse.Namespace) -> int:
             vision_limits=limits,
         )
     pipeline = Pipeline(
-        producer=_producer(args.producer, Path(args.cache_dir)),
+        producer=_producer(args.producer),
         extractors=extractors,
         config=PipelineConfig(
-            cache_dir=Path(args.cache_dir),
             output_dir=Path(args.out),
             max_workers=args.workers,
             review_threshold=args.review_threshold,
@@ -215,44 +190,24 @@ def cmd_run(args: argparse.Namespace) -> int:
     _write(out, "manifest.json", manifest.model_dump(mode="json"))
     _write(out, "results.json", [r.model_dump(mode="json") for r in results])
     _write(out, "job.json", job.model_dump(mode="json"))
+
+    from .deliver import contract_payload, review_sheet
+
+    _write(out, "deliverable.json", contract_payload(job))
+    document = ", ".join(Path(p).name for p in args.pdf)
+    (out / "review.md").write_text(review_sheet(job, document=document))
+
     if args.markdown:
         from .assemble import reassemble_markdown
 
         _write(out, "reassembled.md", reassemble_markdown(manifest, pipeline.content_by_file()))
-    print(f"wrote {out}/manifest.json, results.json, job.json")
+    print(f"wrote {out}/deliverable.json (GoSelect schema) and {out}/review.md (human check)")
     return 0 if job.status.value != "FAILED" else 1
 
 
-def cmd_bench(args: argparse.Namespace) -> int:
-    from . import bench as bench_module
-
-    producers = {}
-    for name in args.producers.split(","):
-        name = name.strip()
-        if not name:
-            continue
-        try:
-            producers[name] = _producer(name, Path(args.cache_dir))
-        except SystemExit as exc:
-            print(f"skipping {name}: {exc}", file=sys.stderr)
-        except (ImportError, KeyError) as exc:
-            print(f"skipping {name}: not configured ({exc})", file=sys.stderr)
-
-    if not producers:
-        print("no producers configured", file=sys.stderr)
-        return 2
-
-    documents = {Path(p).name: Path(p).read_bytes() for p in args.pdf}
-    rows = bench_module.run(producers, documents)
-    print(bench_module.render(rows))
-    path = bench_module.write(rows, Path(args.out))
-    print(f"\nwrote {path}")
-    return 0 if all(r.ok for r in rows) else 1
-
-
 def cmd_setup_analyzer(args: argparse.Namespace) -> int:
-    """One-off: create the router and the field analyzer it routes into."""
-    from .field_schema import count_fields, load_field_schema
+    """One-off: create the per-category field analyzers, then the router."""
+    from .field_schema import count_fields, schedule_schema, text_schema
     from .producers.content_understanding import (
         ensure_analyzer,
         field_analyzer,
@@ -261,19 +216,21 @@ def cmd_setup_analyzer(args: argparse.Namespace) -> int:
 
     client = _content_understanding_client()
     out = Path(args.out)
+    base = args.analyzer_id
 
-    field_id = args.field_analyzer_id
-    if field_id:
-        # Before the router: a category cannot reference an analyzer that does not exist.
-        schema = load_field_schema(args.contract)
-        fields = field_analyzer(schema)
-        ensure_analyzer(client, field_id, fields)
-        print(f"analyzer {field_id} ready ({count_fields(schema)} named fields)")
-        _write(out, "cu-fields.json", fields.as_dict())
+    # Before the router: a category cannot reference an analyzer that does not exist.
+    routes = {}
+    for category, schema in (("schedule", schedule_schema()), ("text", text_schema())):
+        analyzer_id = f"{base}{category.capitalize()}"
+        analyzer = field_analyzer(schema)
+        ensure_analyzer(client, analyzer_id, analyzer)
+        routes[category] = analyzer_id
+        print(f"analyzer {analyzer_id} ready ({count_fields(schema)} named fields)")
+        _write(out, f"cu-fields-{category}.json", analyzer.as_dict())
 
-    router = router_analyzer(in_page_segments=args.in_page_segments, field_analyzer_id=field_id)
-    ensure_analyzer(client, args.analyzer_id, router)
-    print(f"analyzer {args.analyzer_id} ready")
+    router = router_analyzer(in_page_segments=args.in_page_segments, field_analyzer_ids=routes)
+    ensure_analyzer(client, base, router)
+    print(f"analyzer {base} ready, routing {routes}")
     _write(out, "cu-router.json", router.as_dict())
     return 0
 
@@ -307,12 +264,11 @@ def main(argv: list[str] | None = None) -> int:
 
     def common(p: argparse.ArgumentParser) -> None:
         p.add_argument("pdf", nargs="+")
-        p.add_argument("--cache-dir", default=".cache")
         p.add_argument("--out", default="out")
         p.add_argument("--review-threshold", type=float, default=0.25)
         p.add_argument(
             "--producer",
-            default="di-layout",
+            default="content-understanding",
             help=f"segment producer; one of {available_producers()}",
         )
 
@@ -341,26 +297,10 @@ def main(argv: list[str] | None = None) -> int:
     p_tiles.add_argument("--point-size", type=float, default=10.0)
     p_tiles.set_defaults(func=cmd_tiles)
 
-    p_bench = sub.add_parser("bench", help="compare producers on the same corpus")
-    p_bench.add_argument("pdf", nargs="+")
-    p_bench.add_argument("--cache-dir", default=".cache")
-    p_bench.add_argument("--out", default="out")
-    p_bench.add_argument(
-        "--producers",
-        default="di-layout",
-        help=f"comma-separated; available: {','.join(available_producers())}",
-    )
-    p_bench.set_defaults(func=cmd_bench)
-
     p_setup = sub.add_parser(
         "setup-analyzer", help="one-off: create the Content Understanding router analyzer"
     )
     p_setup.add_argument("--analyzer-id", default=os.getenv("CU_ANALYZER_ID", DEFAULT_ANALYZER_ID))
-    p_setup.add_argument(
-        "--field-analyzer-id",
-        default=os.getenv("CU_FIELD_ANALYZER_ID", f"{os.getenv('CU_ANALYZER_ID', DEFAULT_ANALYZER_ID)}Fields"),
-        help="analyzer the prose and grid categories route into; empty disables routing",
-    )
     p_setup.add_argument(
         "--contract", default=None, help="path to the agreed extraction contract JSON"
     )

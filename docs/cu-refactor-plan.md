@@ -1,15 +1,26 @@
-# GoSelect docproc — CU refactor plan + verified facts (Aug 2026)
+# CU refactor — decision record and verified service facts
 
-**Read this first after a devcontainer rebuild.** Chat history lives in `~/.vscode-server` inside
-the container and does not survive one; this file does. Steps 1-3 are done and pushed. Step 4 is
-next. Every fact below was verified against the live service or the OpenAPI spec on 2026-08-24 —
-where a claim came from docs prose and turned out wrong, that is called out, so do not "correct"
-them back.
+**Status: the refactor described here is complete. See `README.md` for how the
+pipeline works now.** This file is kept for two things the README does not carry:
+the verified Content Understanding service surface (§"CU SDK" and §"Service
+facts"), and the record of which claims turned out to be wrong. Do not "correct"
+those back — each was checked against the live service or the OpenAPI spec.
 
-Working env after a successful rebuild: no conda, `.venv/bin/python`, packages via the CFS proxy
-(`PIP_INDEX_URL` is set in devcontainer.json). Run tests with `.venv/bin/python -m pytest -q`
-(150 passing). The CLI is `goselect-docproc`, or `python -m goselect_docproc.cli` with
-`PYTHONPATH=src`. `segment` costs one Content Understanding call per page and no model spend.
+Superseded by the README where the two disagree. Known stale below: the
+environment section predates the move off `.venv`, and the step list predates the
+per-category sub-analyzers. What actually shipped:
+
+- Steps 0-3 done: five-category taxonomy with PLAN drop, SDK client, native
+  `sections` tree, contract lifted into a `ContentFieldSchema`.
+- Step 4 done: `allow_in_page_segments` measured, rescues pages 2, 3 and 5 of the
+  combined-electrical package.
+- Step 5 done: the Document Intelligence path is deleted - 1,289 lines.
+- **Beyond the plan:** one shared field analyzer did not work. The 112-field
+  contract is accepted by the service but truncates at 17 of 42 rows with every
+  `electrical` block empty. Replaced by one sub-analyzer per category (22 fields
+  for schedules, 18 for prose), with the contract assembled in Python. 42/42 rows.
+- **Beyond the plan:** the pipeline now emits the agreed schema and a human review
+  sheet (`deliver.py`). It previously produced only internal shapes.
 
 ## Environment (migration DONE, needs container rebuild to take effect)
 - conda removed. `environment.yml` deleted. Image now `mcr.microsoft.com/devcontainers/python:1-3.12-bookworm`.
@@ -244,8 +255,23 @@ Net: ~1,400-1,600 of ~3,850 src lines removable (~40%).
 4. Bench allow_in_page_segments vs regions.py on Package A via eval/score.py  [preview]  <- NEXT
    Success metric already wired: `Pipeline._warn_on_collateral_drops` count should fall to zero,
    because a schedule sharing a plan sheet stops being dropped with it.
-5. Delete segmentation/regions/geometry/layout/di_layout if 4 holds           [preview]
-   Do this one as a PR, not a direct commit: ~800 lines and it ends the bench-off permanently.
+5. ~~Delete segmentation/regions/geometry/layout/di_layout~~ DONE on branch `remove-di-path`.
+   Justification was NOT step 4's collateral-drop metric (that metric was wrong: a plan sheet
+   always carries dimension notes, so the count never reaches zero). The decisive fact is a
+   CAPABILITY gap: the heuristic classifier structurally cannot emit `PLAN`. A scaled layout and
+   a one-line diagram are both sparse bordered sheets, so no geometric measurement separates
+   them - meaning the DI path could never implement the customer's plan-drop policy. Keeping it
+   as a control arm bought nothing.
+   Removed: layout.py (171), producers/di_layout.py (94), segmentation.py (211), regions.py (141),
+   geometry.py (62), bench.py (225), tests/conftest.py (153, all DI object-model fakes),
+   tests/test_regions_sections.py (150), eval/dpi_ladder.py (82). Shrank sections.py 301 -> 173
+   and cli.py 384 -> 322. Dropped the `azure-ai-documentintelligence` dependency.
+   Net: 1,289 lines deleted; src 4,299/23 modules -> 3,693/18. 137 tests pass.
+   NOTE the plan above over-promised: models.py, extractors.py schemas and expand() were NOT
+   deleted, because DRAWING still calls a vision model directly - the service returns no figure
+   image bytes. Those only go if step 6 succeeds.
+   Section-attribution tests were rewritten against producer-neutral `tree_index` in
+   tests/test_sections.py rather than deleted, so the drawing-never-inherits rule stays covered.
 6. Agentic control arm on Package B drawings vs the tiling path               [preview]
 
 ## Gotchas hit

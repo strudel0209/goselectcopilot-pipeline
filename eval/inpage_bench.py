@@ -1,9 +1,9 @@
 """Does in-page segmentation beat span subtraction?
 
-The GA classifier's minimum unit is a page, which is why ``regions.py`` exists.
-``2026-06-01-preview`` adds ``allow_in_page_segments``. This runs both against
-the same documents and reports the difference, so step 5 - deleting
-``regions.py`` and everything behind it - is decided by measurement.
+The GA classifier's minimum unit is a page, which is why the old span-subtraction
+path existed. ``2026-06-01-preview`` adds ``allow_in_page_segments``. This runs
+both against the same documents and reports the difference; the measurement is
+what justified deleting that path.
 
 Two analyzers are deployed, identical except for that one flag, and neither
 routes fields: this measures boundaries, not extraction.

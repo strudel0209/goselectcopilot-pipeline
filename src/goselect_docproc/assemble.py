@@ -227,6 +227,9 @@ def merge(
         applications=applications,
         pairs=_merge_pairs(pairs),
         notes=notes,
+        contract_rows=[
+            row for r in ordered if r.payload for row in r.payload.contract_rows
+        ],
     )
 
     review = [s.segment_id for s in manifest.segments if s.confidence < review_threshold]

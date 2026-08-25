@@ -1,8 +1,9 @@
-"""Contract-shaped service output -> domain payload.
+"""Per-category service output -> contract rows and domain payload.
 
 The doubles below mirror what Content Understanding actually returned for
-``sample_docs/98624_1_VFDSchedule.pdf``: nested value objects, a ``D(page,...)``
-source string and a per-field confidence.
+``sample_docs/98624_1_VFDSchedule.pdf``: a ``D(page,...)`` source string and a
+per-field confidence. Each routed category has its own compact schema, so each
+has its own expander.
 """
 
 from __future__ import annotations
@@ -15,7 +16,8 @@ from goselect_docproc.extractors import (
     RoutedFieldExtractor,
     SegmentContext,
     default_extractors,
-    expand_contract,
+    expand_schedule,
+    expand_text,
     parse_source,
 )
 from goselect_docproc.reconcile import TagLexicon
@@ -37,39 +39,39 @@ def measure(value, unit=None):
     return Field(obj={"value": Field(value), "unit": Field(unit)})
 
 
-def pair_entry(tag="VFD-401", *, confidence=0.52, source="D(3,1.0,2.0,4.0,2.0,4.0,3.0,1.0,3.0)"):
+def schedule_row(tag="VFD-401", *, confidence=0.52, source="D(3,1.0,2.0,4.0,2.0,4.0,3.0,1.0,3.0)"):
     return Field(
         obj={
             "tag": Field(tag, source=source, confidence=confidence),
             "location": Field("MECH ROOM"),
+            "serves": Field("FIRST FLOOR"),
+            "manufacturer": Field("ABB"),
+            "model_number": Field("ABB ACH 580"),
+            "enclosure_rating": Field("NEMA 1"),
+            "harmonic_mitigation": Field("YES"),
+            "motor_power": Field("45 HP"),
+            "voltage": Field("460 V"),
+            "phases": Field("3"),
             "notes": Field("1,2,3,4"),
-            "vfd": Field(
-                obj={
-                    "enclosure_rating": Field(obj={"value": Field("NEMA 12")}),
-                    "harmonic_mitigation": Field(obj={"value": Field("Passive filter")}),
-                    "electrical": Field(
-                        obj={
-                            "input_voltage": measure("480", "V"),
-                            "output_current": measure("124", "A"),
-                            "power_rating": measure("75", "kW"),
-                        }
-                    ),
-                }
-            ),
-            "motor": Field(
-                obj={
-                    "frame_size": Field("256T"),
-                    "electrical": Field(
-                        obj={
-                            "voltage": measure("460", "V"),
-                            "frequency": measure("60", "Hz"),
-                            "power_rating": measure("100", "HP"),
-                        }
-                    ),
-                }
-            ),
         }
     )
+
+
+def prose_requirements():
+    return {
+        "requirements": Field(
+            obj={
+                "manufacturer": Field("ABB"),
+                "product_name": Field("ACH580"),
+                "input_voltage": Field("460 V"),
+                "input_phases": Field("3"),
+                "harmonic_mitigation": Field("Passive filter"),
+                "ampacity_reference": Field("see the single line diagrams"),
+            },
+            source="D(2,1.0,2.0,4.0,2.0,4.0,3.0,1.0,3.0)",
+            confidence=0.7,
+        )
+    }
 
 
 def context(content_type=ContentType.SCHEDULE, lexicon=None):
@@ -84,7 +86,7 @@ def context(content_type=ContentType.SCHEDULE, lexicon=None):
 
 @pytest.fixture
 def fields():
-    return {"vfd_motor_pairs": Field(array=[pair_entry()])}
+    return {"rows": Field(array=[schedule_row()])}
 
 
 class TestParseSource:
@@ -103,9 +105,9 @@ class TestParseSource:
         assert parse_source("D(nonsense)") == (None, None)
 
 
-class TestExpandContract:
-    def test_one_pair_yields_a_drive_a_motor_and_a_pairing(self, fields):
-        payload = expand_contract(fields, context(), ContentType.SCHEDULE)
+class TestExpandSchedule:
+    def test_one_row_yields_a_drive_a_motor_and_a_pairing(self, fields):
+        payload = expand_schedule(fields, context())
 
         assert len(payload.vfds) == 1
         assert len(payload.motors) == 1
@@ -113,44 +115,71 @@ class TestExpandContract:
         assert payload.pairs[0].vfd_tag == "VFD-401"
         assert payload.pairs[0].motor_tag is None, "the contract has no motor tag field"
 
-    def test_measurements_keep_the_verbatim_reading(self, fields):
-        payload = expand_contract(fields, context(), ContentType.SCHEDULE)
+    def test_a_row_becomes_a_contract_shaped_row(self, fields):
+        row = expand_schedule(fields, context()).contract_rows[0]
 
-        power = payload.vfds[0].power
-        assert (power.value, power.unit, power.raw) == (75.0, "kW", "75")
+        assert row["tag"] == "VFD-401"
+        assert row["location"] == "MECH ROOM"
+        assert row["application"] == "FIRST FLOOR"
+        assert row["vfd"]["manufacturer"] == "ABB"
+        assert row["vfd"]["enclosure_rating"]["value"] == "NEMA 1"
+
+    def test_the_electrical_block_is_populated(self, fields):
+        """The whole point of the split: the 112-field schema never reached these."""
+        row = expand_schedule(fields, context()).contract_rows[0]
+
+        assert row["motor"]["electrical"]["power_rating"]["value"] == 45.0
+        assert row["motor"]["electrical"]["power_rating"]["unit"] == "HP"
+        assert row["vfd"]["electrical"]["input_voltage"]["value"] == 460.0
+        assert row["vfd"]["electrical"]["input_phases"]["value"] == 3.0
+
+    def test_measurements_keep_the_verbatim_reading(self, fields):
+        power = expand_schedule(fields, context()).motors[0].power
+        assert (power.value, power.unit, power.raw) == (45.0, "HP", "45 HP")
 
     def test_grounding_survives_onto_evidence(self, fields):
-        payload = expand_contract(fields, context(), ContentType.SCHEDULE)
+        evidence = expand_schedule(fields, context()).vfds[0].evidence[0]
 
-        evidence = payload.vfds[0].evidence[0]
         assert evidence.page == 3
         assert evidence.polygon and len(evidence.polygon) == 8
         assert evidence.confidence == 0.52
         assert evidence.section_path == "5.1 Motor schedule"
 
-    def test_prose_never_asserts_a_pairing(self):
-        """A specification states requirements; it does not wire a drive to a
-        motor. The schedule grid is what asserts the relationship."""
-        payload = expand_contract(
-            {"vfd_motor_pairs": Field(array=[pair_entry()])},
-            context(ContentType.TEXT),
-            ContentType.TEXT,
-        )
-
-        assert payload.vfds and payload.motors
-        assert payload.pairs == []
-
     def test_tags_are_repaired_against_the_lexicon(self):
-        payload = expand_contract(
-            {"vfd_motor_pairs": Field(array=[pair_entry(tag="VFD-4O1")])},
+        payload = expand_schedule(
+            {"rows": Field(array=[schedule_row(tag="VFD-4O1")])},
             context(lexicon=TagLexicon({"VFD-401"})),
-            ContentType.SCHEDULE,
         )
 
         assert payload.vfds[0].tag == "VFD-401"
 
     def test_an_empty_result_is_not_a_crash(self):
-        assert expand_contract({}, context(), ContentType.SCHEDULE).vfds == []
+        assert expand_schedule({}, context()).vfds == []
+
+
+class TestExpandText:
+    def test_prose_never_asserts_a_pairing(self):
+        """A specification states requirements; it does not wire a drive to a
+        motor. The schedule grid is what asserts the relationship."""
+        payload = expand_text(prose_requirements(), context(ContentType.TEXT))
+
+        assert payload.contract_rows
+        assert payload.pairs == []
+
+    def test_the_requirement_row_carries_no_tag(self):
+        row = expand_text(prose_requirements(), context(ContentType.TEXT)).contract_rows[0]
+
+        assert row["tag"] is None
+        assert row["vfd"]["manufacturer"] == "ABB"
+        assert row["vfd"]["electrical"]["input_voltage"]["value"] == 460.0
+
+    def test_a_deferred_rating_is_recorded_as_a_note(self):
+        payload = expand_text(prose_requirements(), context(ContentType.TEXT))
+
+        assert any("single line diagrams" in n for n in payload.notes)
+
+    def test_an_empty_result_is_not_a_crash(self):
+        assert expand_text({}, context(ContentType.TEXT)).contract_rows == []
 
 
 class TestRoutedFieldExtractor:
