@@ -230,6 +230,9 @@ def merge(
         contract_rows=[
             row for r in ordered if r.payload for row in r.payload.contract_rows
         ],
+        contract_row_sources=[
+            r.segment_id for r in ordered if r.payload for _ in r.payload.contract_rows
+        ],
     )
 
     review = [s.segment_id for s in manifest.segments if s.confidence < review_threshold]

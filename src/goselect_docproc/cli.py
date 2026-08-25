@@ -338,10 +338,13 @@ def main(argv: list[str] | None = None) -> int:
         "--contract", default=None, help="path to the agreed extraction contract JSON"
     )
     p_setup.add_argument(
-        "--in-page-segments",
-        action="store_true",
-        help="preview: let a segment cover part of a page",
+        "--no-in-page-segments",
+        dest="in_page_segments",
+        action="store_false",
+        help="one segment per page; a grid sharing a sheet with a diagram is then "
+        "classified as the diagram and never extracted",
     )
+    p_setup.set_defaults(in_page_segments=True)
     p_setup.add_argument("--out", default="out")
     p_setup.set_defaults(func=cmd_setup_analyzer)
 

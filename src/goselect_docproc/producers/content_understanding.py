@@ -346,26 +346,38 @@ def _fields_by_segment(
     """Category routing returns the router's own content plus one extra entry per
     routed segment. Match those back by the service's own segment id, falling
     back to the page range when a routed entry reports no segments.
+
+    A routed entry can name several native segments: with in-page segmentation a
+    sheet carrying both a diagram and a grid reports both. Its own ``category``
+    is what disambiguates - matching the first id instead attached a schedule's
+    rows to the drawing beside it, whose extractor ignores them, and the rows
+    were silently lost.
     """
     by_native = {
-        block.segment_id: segment.segment_id
+        block.segment_id: segment
         for block, segment in zip(blocks, segments)
         if block.segment_id
     }
-    by_pages = {(s.first_page, s.last_page): s.segment_id for s in segments}
+    by_pages: dict[tuple[int, int], list[Segment]] = {}
+    for segment in segments:
+        by_pages.setdefault((segment.first_page, segment.last_page), []).append(segment)
 
     out: dict[str, Any] = {}
     for content in response.contents or []:
         fields = getattr(content, "fields", None)
         if content is router_content or not fields:
             continue
-        owner = None
-        for block in getattr(content, "segments", None) or []:
-            owner = by_native.get(block.segment_id)
-            if owner:
-                break
-        if owner is None:
-            owner = by_pages.get((content.start_page_number, content.end_page_number))
+        wanted = CATEGORY_TO_KIND.get(getattr(content, "category", None) or "")
+        candidates = [
+            by_native[b.segment_id]
+            for b in (getattr(content, "segments", None) or [])
+            if b.segment_id in by_native
+        ] or by_pages.get((content.start_page_number, content.end_page_number), [])
+
+        owner = next(
+            (c.segment_id for c in candidates if wanted and c.content_type is wanted),
+            candidates[0].segment_id if candidates else None,
+        )
         if owner:
             out[owner] = fields
         else:

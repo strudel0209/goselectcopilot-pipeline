@@ -353,6 +353,8 @@ class ExtractionPayload(Strict):
     pairs: list[Pair] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
     contract_rows: list[dict] = Field(default_factory=list)
+    contract_row_sources: list[str] = Field(default_factory=list)
+    """Segment id per contract row. Rows from one segment are distinct items."""
     """The service's own contract-shaped rows, unwrapped but not reinterpreted.
 
     The domain models above are deliberately narrow - they carry only what the

@@ -65,25 +65,31 @@ def confidence_of(node: Any) -> float | None:
     return getattr(node, "confidence", None)
 
 
-def _merge_rows(rows: list[dict]) -> list[dict]:
-    """One row per tag, first non-null value wins.
+def _merge_rows(rows: list[dict], sources: list[str] | None = None) -> list[dict]:
+    """Reconcile the same tag *across* segments; never within one.
 
-    Two segments describing the same tag - a schedule row and a specification
-    clause - must not produce two entries in the deliverable.
+    Two rows of one schedule are two pieces of equipment, however similar. On the
+    Colbert package all three drives sit under one "FED FROM" value of MCC-FB, so
+    merging by tag alone collapsed three drives into one. A tag is only a join key
+    between segments - a specification clause and the schedule row it describes.
     """
-    merged: "OrderedDict[str | None, dict]" = OrderedDict()
-    for row in rows:
+    sources = sources or [""] * len(rows)
+    merged: list[dict] = []
+    seen: dict[str, int] = {}
+    for row, source in zip(rows, sources):
         tag = row.get("tag")
-        if tag not in merged:
-            merged[tag] = dict(row)
+        key = f"{tag}" if tag else None
+        index = seen.get(key) if key else None
+        if index is not None and merged[index]["__source"] != source:
+            _fill(merged[index], row)
             continue
-        target = merged[tag]
-        for key, value in row.items():
-            if target.get(key) is None:
-                target[key] = value
-            elif isinstance(value, dict) and isinstance(target.get(key), dict):
-                _fill(target[key], value)
-    return list(merged.values())
+        merged.append(dict(row, __source=source))
+        if key:
+            seen[key] = len(merged) - 1
+    for row in merged:
+        row.pop("__source", None)
+    # A row the extractor filled with nothing tells a reviewer nothing.
+    return [row for row in merged if _populated(row)]
 
 
 def _fill(target: dict, incoming: dict) -> None:
@@ -105,7 +111,11 @@ def _populated(node: Any) -> int:
 
 def contract_payload(result: JobResult) -> dict[str, Any]:
     """The agreed GoSelect schema, built from the service's own rows."""
-    return {"vfd_motor_pairs": _merge_rows(result.payload.contract_rows)}
+    return {
+        "vfd_motor_pairs": _merge_rows(
+            result.payload.contract_rows, result.payload.contract_row_sources
+        )
+    }
 
 
 def _flatten(node: Any, prefix: str = "") -> list[tuple[str, Any]]:
@@ -137,7 +147,7 @@ LABELS = {
 
 def review_sheet(result: JobResult, *, document: str = "") -> str:
     """A sheet a proposals engineer can check without reading JSON."""
-    rows = _merge_rows(result.payload.contract_rows)
+    rows = _merge_rows(result.payload.contract_rows, result.payload.contract_row_sources)
     leaves = sum(len(_flatten(r)) for r in rows)
     filled = sum(_populated(r) for r in rows)
 
