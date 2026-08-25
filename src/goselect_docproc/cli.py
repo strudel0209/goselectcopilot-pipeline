@@ -26,7 +26,7 @@ from .producers.content_understanding import DEFAULT_ANALYZER_ID
 from .tiling import VisionLimits, assess, plan_tiles
 
 
-def _producer(name: str, cache_dir: Path):
+def _producer(name: str):
     """Swap the front half by configuration. The spine never changes."""
     from .producers import ContentUnderstandingProducer
 
@@ -103,9 +103,9 @@ def _report_segments(manifest, threshold: float) -> None:
 
 def cmd_segment(args: argparse.Namespace) -> int:
     pipeline = Pipeline(
-        producer=_producer(args.producer, Path(args.cache_dir)),
+        producer=_producer(args.producer),
         extractors={},
-        config=PipelineConfig(cache_dir=Path(args.cache_dir), output_dir=Path(args.out)),
+        config=PipelineConfig(output_dir=Path(args.out)),
     )
     manifest = pipeline.segment(_sources(args.pdf))
     _report_segments(manifest, args.review_threshold)
@@ -117,9 +117,9 @@ def cmd_segment(args: argparse.Namespace) -> int:
 
 def cmd_plan(args: argparse.Namespace) -> int:
     pipeline = Pipeline(
-        producer=_producer(args.producer, Path(args.cache_dir)),
+        producer=_producer(args.producer),
         extractors={},
-        config=PipelineConfig(cache_dir=Path(args.cache_dir), output_dir=Path(args.out)),
+        config=PipelineConfig(output_dir=Path(args.out)),
     )
     manifest = pipeline.segment(_sources(args.pdf))
     items = pipeline.plan(manifest)
@@ -168,10 +168,9 @@ def cmd_run(args: argparse.Namespace) -> int:
             vision_limits=limits,
         )
     pipeline = Pipeline(
-        producer=_producer(args.producer, Path(args.cache_dir)),
+        producer=_producer(args.producer),
         extractors=extractors,
         config=PipelineConfig(
-            cache_dir=Path(args.cache_dir),
             output_dir=Path(args.out),
             max_workers=args.workers,
             review_threshold=args.review_threshold,
@@ -207,8 +206,8 @@ def cmd_run(args: argparse.Namespace) -> int:
 
 
 def cmd_setup_analyzer(args: argparse.Namespace) -> int:
-    """One-off: create the router and the field analyzer it routes into."""
-    from .field_schema import count_fields, load_field_schema
+    """One-off: create the per-category field analyzers, then the router."""
+    from .field_schema import count_fields, schedule_schema, text_schema
     from .producers.content_understanding import (
         ensure_analyzer,
         field_analyzer,
@@ -217,19 +216,21 @@ def cmd_setup_analyzer(args: argparse.Namespace) -> int:
 
     client = _content_understanding_client()
     out = Path(args.out)
+    base = args.analyzer_id
 
-    field_id = args.field_analyzer_id
-    if field_id:
-        # Before the router: a category cannot reference an analyzer that does not exist.
-        schema = load_field_schema(args.contract)
-        fields = field_analyzer(schema)
-        ensure_analyzer(client, field_id, fields)
-        print(f"analyzer {field_id} ready ({count_fields(schema)} named fields)")
-        _write(out, "cu-fields.json", fields.as_dict())
+    # Before the router: a category cannot reference an analyzer that does not exist.
+    routes = {}
+    for category, schema in (("schedule", schedule_schema()), ("text", text_schema())):
+        analyzer_id = f"{base}{category.capitalize()}"
+        analyzer = field_analyzer(schema)
+        ensure_analyzer(client, analyzer_id, analyzer)
+        routes[category] = analyzer_id
+        print(f"analyzer {analyzer_id} ready ({count_fields(schema)} named fields)")
+        _write(out, f"cu-fields-{category}.json", analyzer.as_dict())
 
-    router = router_analyzer(in_page_segments=args.in_page_segments, field_analyzer_id=field_id)
-    ensure_analyzer(client, args.analyzer_id, router)
-    print(f"analyzer {args.analyzer_id} ready")
+    router = router_analyzer(in_page_segments=args.in_page_segments, field_analyzer_ids=routes)
+    ensure_analyzer(client, base, router)
+    print(f"analyzer {base} ready, routing {routes}")
     _write(out, "cu-router.json", router.as_dict())
     return 0
 
@@ -263,7 +264,6 @@ def main(argv: list[str] | None = None) -> int:
 
     def common(p: argparse.ArgumentParser) -> None:
         p.add_argument("pdf", nargs="+")
-        p.add_argument("--cache-dir", default=".cache")
         p.add_argument("--out", default="out")
         p.add_argument("--review-threshold", type=float, default=0.25)
         p.add_argument(
@@ -301,11 +301,6 @@ def main(argv: list[str] | None = None) -> int:
         "setup-analyzer", help="one-off: create the Content Understanding router analyzer"
     )
     p_setup.add_argument("--analyzer-id", default=os.getenv("CU_ANALYZER_ID", DEFAULT_ANALYZER_ID))
-    p_setup.add_argument(
-        "--field-analyzer-id",
-        default=os.getenv("CU_FIELD_ANALYZER_ID", f"{os.getenv('CU_ANALYZER_ID', DEFAULT_ANALYZER_ID)}Fields"),
-        help="analyzer the prose and grid categories route into; empty disables routing",
-    )
     p_setup.add_argument(
         "--contract", default=None, help="path to the agreed extraction contract JSON"
     )

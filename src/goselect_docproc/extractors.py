@@ -33,6 +33,7 @@ from .contracts import (
 )
 from .reconcile import TagLexicon
 from .deliver import plain
+from .field_schema import empty_contract_row
 from .sections import SectionIndex
 from .spans import text_for
 from .tiling import Tile, VisionLimits, tile_image
@@ -435,85 +436,6 @@ def _valued(node: Any) -> str | None:
     return _text(_obj(node).get("value"))
 
 
-def expand_contract(
-    fields: Any, context: SegmentContext, origin: ContentType
-) -> ExtractionPayload:
-    """Contract-shaped service output -> domain payload.
-
-    The service returns the agreed schema; this only reshapes it and never
-    reinterprets a value. Units and arithmetic stay in ``parse_quantity``.
-    """
-    payload = ExtractionPayload()
-    pairs = fields.get("vfd_motor_pairs") if hasattr(fields, "get") else None
-    for index, entry in enumerate(getattr(pairs, "value_array", None) or []):
-        body = _obj(entry)
-        payload.contract_rows.append(plain(entry))
-        tag_node = body.get("tag")
-        tag = _text(tag_node)
-        if tag and context.lexicon:
-            repair = context.lexicon.snap(tag)
-            if repair.method == "ambiguous":
-                payload.notes.append(
-                    f"tag {tag!r} ambiguous between {list(repair.ambiguous_with)}"
-                )
-            tag = repair.value
-
-        source = "table" if origin is ContentType.SCHEDULE else "text"
-        evidence = _evidence(tag_node or entry, context, source)
-
-        vfd = _obj(body.get("vfd"))
-        motor = _obj(body.get("motor"))
-        vfd_power = _obj(vfd.get("electrical"))
-        motor_power = _obj(motor.get("electrical"))
-
-        if vfd:
-            payload.vfds.append(
-                VfdSpec(
-                    tag=tag,
-                    power=_quantity(vfd_power.get("power_rating")),
-                    voltage=_quantity(vfd_power.get("input_voltage")),
-                    current=_quantity(vfd_power.get("output_current")),
-                    enclosure=_valued(vfd.get("enclosure_rating")),
-                    filter=_valued(vfd.get("harmonic_mitigation")),
-                    evidence=[evidence],
-                )
-            )
-        if motor:
-            payload.motors.append(
-                MotorSpec(
-                    tag=tag,
-                    power=_quantity(motor_power.get("power_rating")),
-                    voltage=_quantity(motor_power.get("voltage")),
-                    frequency=_quantity(motor_power.get("frequency")),
-                    speed=_quantity(motor_power.get("speed")),
-                    frame_size=_text(motor.get("frame_size")),
-                    evidence=[evidence],
-                )
-            )
-        # The contract keys a pair on one tag and gives the motor no identifier of
-        # its own, so the pairing is one-sided. Only a grid asserts a relationship;
-        # prose states requirements.
-        if tag and vfd and motor and origin is ContentType.SCHEDULE:
-            payload.pairs.append(
-                Pair(
-                    pair_id=f"{context.item.segment_id}-p{index}",
-                    vfd_tag=tag,
-                    motor_tag=None,
-                    origin=origin,
-                    confidence=float(getattr(tag_node, "confidence", None) or 0.0),
-                    evidence=[evidence],
-                )
-            )
-
-
-    if payload.pairs:
-        payload.notes.append(
-            f"{len(payload.pairs)} pairs are one-sided: the agreed contract has no motor tag "
-            "field, so a motor is identified only by the pair it belongs to"
-        )
-    return payload
-
-
 @dataclass
 class RoutedFieldExtractor:
     """Uses fields the producer already extracted, or falls back to a model.
@@ -532,8 +454,9 @@ class RoutedFieldExtractor:
         return getattr(self.fallback, "model", None)
 
     def extract(self, context: SegmentContext) -> ExtractionPayload:
-        if context.fields:
-            return expand_contract(context.fields, context, self.content_type)
+        expand = EXPANDERS.get(self.content_type)
+        if context.fields and expand is not None:
+            return expand(context.fields, context)
         if self.fallback is not None:
             return self.fallback.extract(context)
         return ExtractionPayload(
@@ -579,3 +502,173 @@ def default_extractors(model: ModelClient, limits: VisionLimits | None = None) -
         {ct: DropExtractor(content_type=ct, reason=reason) for ct, reason in DROP_REASONS.items()}
     )
     return extractors
+
+
+def _measure(text: str | None, unit: str | None = None) -> dict[str, Any]:
+    """A schedule cell -> the contract's {value, unit, details}.
+
+    A grid puts the unit in the column header, so it arrives separately from the
+    cell; prose puts it inline. Both are accepted.
+    """
+    if not text:
+        return {"value": None, "unit": None, "details": None}
+    parsed = parse_quantity(f"{text} {unit}" if unit else text)
+    return {"value": parsed.value, "unit": unit or parsed.unit, "details": text}
+
+
+def _stated(text: str | None) -> dict[str, Any]:
+    return {"value": text, "reference": None, "details": None}
+
+
+def expand_schedule(fields: Any, context: SegmentContext) -> ExtractionPayload:
+    """Compact schedule rows -> contract rows plus the domain models.
+
+    The schedule states one supply voltage and one phase count per row; both the
+    drive input and the motor sit on that supply, so the value is recorded on
+    each side and the shared origin is noted rather than inferred silently.
+    """
+    payload = ExtractionPayload()
+    rows = fields.get("rows") if hasattr(fields, "get") else None
+    for index, entry in enumerate(getattr(rows, "value_array", None) or []):
+        cell = _obj(entry)
+        tag_node = cell.get("tag")
+        tag = _text(tag_node)
+        if tag and context.lexicon:
+            repair = context.lexicon.snap(tag)
+            if repair.method == "ambiguous":
+                payload.notes.append(f"tag {tag!r} ambiguous between {list(repair.ambiguous_with)}")
+            tag = repair.value
+
+        evidence = _evidence(tag_node or entry, context, "table")
+        get = lambda name: _text(cell.get(name))  # noqa: E731
+
+        row = empty_contract_row()
+        row["tag"] = tag
+        row["location"] = get("location")
+        row["application"] = get("serves")
+        row["notes"] = get("notes")
+
+        vfd, motor = row["vfd"], row["motor"]
+        vfd["manufacturer"] = get("manufacturer")
+        vfd["model_number"] = get("model_number")
+        vfd["product_name"] = get("model_number")
+        volts_unit = get("voltage_unit")
+        vfd["electrical"]["input_voltage"] = _measure(get("voltage"), volts_unit)
+        vfd["electrical"]["input_phases"] = {"value": _number(get("phases")), "details": get("phases")}
+        vfd["electrical"]["input_frequency"] = _measure(get("frequency"))
+        vfd["enclosure_rating"] = _stated(get("enclosure_rating"))
+        vfd["harmonic_mitigation"] = _stated(get("harmonic_mitigation"))
+        vfd["disconnect"] = _stated(get("disconnect"))
+        vfd["bypass"] = _stated(get("bypass"))
+
+        motor["electrical"]["power_rating"] = _measure(get("motor_power"), get("motor_power_unit"))
+        motor["electrical"]["voltage"] = _measure(get("voltage"), volts_unit)
+        motor["electrical"]["current"] = _measure(get("motor_current"))
+        motor["electrical"]["speed"] = _measure(get("motor_speed"))
+        motor["electrical"]["frequency"] = _measure(get("frequency"))
+        motor["electrical"]["phases"] = {"value": _number(get("phases")), "details": get("phases")}
+        payload.contract_rows.append(row)
+
+        power = _measure(get("motor_power"), get("motor_power_unit"))
+        volts = _measure(get("voltage"), volts_unit)
+        payload.vfds.append(
+            VfdSpec(
+                tag=tag,
+                voltage=Quantity(value=volts["value"], unit=volts["unit"], raw=volts["details"]),
+                enclosure=get("enclosure_rating"),
+                filter=get("harmonic_mitigation"),
+                evidence=[evidence],
+            )
+        )
+        payload.motors.append(
+            MotorSpec(
+                tag=tag,
+                power=Quantity(value=power["value"], unit=power["unit"], raw=power["details"]),
+                voltage=Quantity(value=volts["value"], unit=volts["unit"], raw=volts["details"]),
+                evidence=[evidence],
+            )
+        )
+        if tag:
+            payload.pairs.append(
+                Pair(
+                    pair_id=f"{context.item.segment_id}-p{index}",
+                    vfd_tag=tag,
+                    motor_tag=None,
+                    origin=ContentType.SCHEDULE,
+                    confidence=float(getattr(tag_node, "confidence", None) or 0.0),
+                    evidence=[evidence],
+                )
+            )
+
+    if payload.contract_rows:
+        payload.notes.append(
+            "voltage and phases are one column per row in the schedule and are "
+            "recorded on both the drive and the motor"
+        )
+    return payload
+
+
+def _number(text: str | None) -> float | None:
+    try:
+        return float(str(text).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def expand_text(fields: Any, context: SegmentContext) -> ExtractionPayload:
+    """Specification prose -> one contract row carrying requirements, no tag.
+
+    Prose names no individual equipment, so this can never assert a pairing. The
+    row is tagless on purpose: assembly merges it into the tagged rows a schedule
+    or drawing supplies.
+    """
+    payload = ExtractionPayload()
+    node = fields.get("requirements") if hasattr(fields, "get") else None
+    body = _obj(node)
+    if not body:
+        return payload
+
+    get = lambda name: _text(body.get(name))  # noqa: E731
+    listed = lambda name: [  # noqa: E731
+        v for v in (_text(c) for c in (getattr(body.get(name), "value_array", None) or [])) if v
+    ]
+
+    row = empty_contract_row()
+    row["application"] = None
+    vfd = row["vfd"]
+    vfd["manufacturer"] = get("manufacturer")
+    vfd["product_name"] = get("product_name")
+    vfd["model_number"] = get("model_number")
+    vfd["electrical"]["input_voltage"] = _measure(get("input_voltage"))
+    vfd["electrical"]["input_phases"] = {"value": _number(get("input_phases")), "details": get("input_phases")}
+    vfd["electrical"]["input_frequency"] = _measure(get("input_frequency"))
+    vfd["electrical"]["output_frequency_min"] = _measure(get("output_frequency_min"))
+    vfd["electrical"]["output_frequency_max"] = _measure(get("output_frequency_max"))
+    vfd["enclosure_rating"] = _stated(get("enclosure_rating"))
+    vfd["harmonic_mitigation"] = _stated(get("harmonic_mitigation"))
+    vfd["bypass"] = _stated(get("bypass"))
+    vfd["disconnect"] = _stated(get("disconnect"))
+    vfd["certifications"] = listed("certifications")
+    vfd["features"] = listed("features")
+    payload.contract_rows.append(row)
+
+    evidence = _evidence(node, context, "text")
+    volts = _measure(get("input_voltage"))
+    payload.vfds.append(
+        VfdSpec(
+            voltage=Quantity(value=volts["value"], unit=volts["unit"], raw=volts["details"]),
+            enclosure=get("enclosure_rating"),
+            filter=get("harmonic_mitigation"),
+            evidence=[evidence],
+        )
+    )
+    if deferred := get("ampacity_reference"):
+        payload.notes.append(f"specification defers ratings: {deferred}")
+    return payload
+
+
+# Each routed category has its own schema, so it has its own expander.
+EXPANDERS = {
+    ContentType.SCHEDULE: expand_schedule,
+    ContentType.TEXT: expand_text,
+}

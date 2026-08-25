@@ -65,7 +65,6 @@ class PipelineConfig:
     # correctly in 24 tiles; 150 dpi reads the same tags but needs 48, over the
     # 40-tile cost guard. DI's own crop of that sheet is 1477x934 and reads VD-401.
     drawing_dpi: int = 100
-    cache_dir: Path = Path(".cache")
     output_dir: Path = Path("out")
 
 

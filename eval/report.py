@@ -76,9 +76,9 @@ def main() -> int:
 
     started = time.perf_counter()
     pipeline = Pipeline(
-        producer=_producer(producer_name, Path(".cache")),
+        producer=_producer(producer_name),
         extractors=extractors,
-        config=PipelineConfig(cache_dir=Path(".cache"), output_dir=Path("out")),
+        config=PipelineConfig(output_dir=Path("out")),
     )
     manifest, job, results = pipeline.run(_sources(pdfs))
     elapsed = time.perf_counter() - started

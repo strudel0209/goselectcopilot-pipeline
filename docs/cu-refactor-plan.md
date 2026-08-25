@@ -1,15 +1,26 @@
-# GoSelect docproc — CU refactor plan + verified facts (Aug 2026)
+# CU refactor — decision record and verified service facts
 
-**Read this first after a devcontainer rebuild.** Chat history lives in `~/.vscode-server` inside
-the container and does not survive one; this file does. Steps 1-3 are done and pushed. Step 4 is
-next. Every fact below was verified against the live service or the OpenAPI spec on 2026-08-24 —
-where a claim came from docs prose and turned out wrong, that is called out, so do not "correct"
-them back.
+**Status: the refactor described here is complete. See `README.md` for how the
+pipeline works now.** This file is kept for two things the README does not carry:
+the verified Content Understanding service surface (§"CU SDK" and §"Service
+facts"), and the record of which claims turned out to be wrong. Do not "correct"
+those back — each was checked against the live service or the OpenAPI spec.
 
-Working env after a successful rebuild: no conda, `.venv/bin/python`, packages via the CFS proxy
-(`PIP_INDEX_URL` is set in devcontainer.json). Run tests with `.venv/bin/python -m pytest -q`
-(150 passing). The CLI is `goselect-docproc`, or `python -m goselect_docproc.cli` with
-`PYTHONPATH=src`. `segment` costs one Content Understanding call per page and no model spend.
+Superseded by the README where the two disagree. Known stale below: the
+environment section predates the move off `.venv`, and the step list predates the
+per-category sub-analyzers. What actually shipped:
+
+- Steps 0-3 done: five-category taxonomy with PLAN drop, SDK client, native
+  `sections` tree, contract lifted into a `ContentFieldSchema`.
+- Step 4 done: `allow_in_page_segments` measured, rescues pages 2, 3 and 5 of the
+  combined-electrical package.
+- Step 5 done: the Document Intelligence path is deleted - 1,289 lines.
+- **Beyond the plan:** one shared field analyzer did not work. The 112-field
+  contract is accepted by the service but truncates at 17 of 42 rows with every
+  `electrical` block empty. Replaced by one sub-analyzer per category (22 fields
+  for schedules, 18 for prose), with the contract assembled in Python. 42/42 rows.
+- **Beyond the plan:** the pipeline now emits the agreed schema and a human review
+  sheet (`deliver.py`). It previously produced only internal shapes.
 
 ## Environment (migration DONE, needs container rebuild to take effect)
 - conda removed. `environment.yml` deleted. Image now `mcr.microsoft.com/devcontainers/python:1-3.12-bookworm`.
