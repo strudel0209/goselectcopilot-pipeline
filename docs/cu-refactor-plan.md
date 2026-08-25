@@ -244,8 +244,23 @@ Net: ~1,400-1,600 of ~3,850 src lines removable (~40%).
 4. Bench allow_in_page_segments vs regions.py on Package A via eval/score.py  [preview]  <- NEXT
    Success metric already wired: `Pipeline._warn_on_collateral_drops` count should fall to zero,
    because a schedule sharing a plan sheet stops being dropped with it.
-5. Delete segmentation/regions/geometry/layout/di_layout if 4 holds           [preview]
-   Do this one as a PR, not a direct commit: ~800 lines and it ends the bench-off permanently.
+5. ~~Delete segmentation/regions/geometry/layout/di_layout~~ DONE on branch `remove-di-path`.
+   Justification was NOT step 4's collateral-drop metric (that metric was wrong: a plan sheet
+   always carries dimension notes, so the count never reaches zero). The decisive fact is a
+   CAPABILITY gap: the heuristic classifier structurally cannot emit `PLAN`. A scaled layout and
+   a one-line diagram are both sparse bordered sheets, so no geometric measurement separates
+   them - meaning the DI path could never implement the customer's plan-drop policy. Keeping it
+   as a control arm bought nothing.
+   Removed: layout.py (171), producers/di_layout.py (94), segmentation.py (211), regions.py (141),
+   geometry.py (62), bench.py (225), tests/conftest.py (153, all DI object-model fakes),
+   tests/test_regions_sections.py (150), eval/dpi_ladder.py (82). Shrank sections.py 301 -> 173
+   and cli.py 384 -> 322. Dropped the `azure-ai-documentintelligence` dependency.
+   Net: 1,289 lines deleted; src 4,299/23 modules -> 3,693/18. 137 tests pass.
+   NOTE the plan above over-promised: models.py, extractors.py schemas and expand() were NOT
+   deleted, because DRAWING still calls a vision model directly - the service returns no figure
+   image bytes. Those only go if step 6 succeeds.
+   Section-attribution tests were rewritten against producer-neutral `tree_index` in
+   tests/test_sections.py rather than deleted, so the drawing-never-inherits rule stays covered.
 6. Agentic control arm on Package B drawings vs the tiling path               [preview]
 
 ## Gotchas hit

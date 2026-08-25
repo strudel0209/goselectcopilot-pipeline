@@ -5,7 +5,7 @@
     goselect-docproc run      <pdf>...   # full pipeline
     goselect-docproc tiles    <w> <h>    # vision legibility budget for a drawing
 
-``segment`` and ``plan`` cost one Layout call per file and nothing else, so they
+``segment`` and ``plan`` cost one analyze call per file and nothing else, so they
 are safe to run repeatedly while tuning.
 """
 
@@ -20,44 +20,20 @@ from pathlib import Path
 
 from .contracts import ContentType
 from .extractors import ModelExtractor, NullModel, default_extractors
-from .layout import LayoutClient
 from .pipeline import Pipeline, PipelineConfig
 from .producers import available as available_producers
 from .producers.content_understanding import DEFAULT_ANALYZER_ID
 from .tiling import VisionLimits, assess, plan_tiles
 
 
-def _layout_client(cache_dir: Path) -> LayoutClient:
-    endpoint = os.getenv("DOCUMENTINTELLIGENCE_ENDPOINT")
-    if not endpoint:
-        # Fully cached corpora replay with no credentials, which is what makes the
-        # eval set runnable in CI.
-        logging.getLogger(__name__).warning(
-            "DOCUMENTINTELLIGENCE_ENDPOINT unset; cache-only mode"
-        )
-        return LayoutClient(None, cache_dir)
-
-    from azure.ai.documentintelligence import DocumentIntelligenceClient
-    from azure.core.credentials import AzureKeyCredential
-    from azure.identity import DefaultAzureCredential
-
-    key = os.getenv("DOCUMENTINTELLIGENCE_API_KEY")
-    credential = AzureKeyCredential(key) if key else DefaultAzureCredential()
-    return LayoutClient(
-        DocumentIntelligenceClient(endpoint=endpoint, credential=credential), cache_dir
-    )
-
-
 def _producer(name: str, cache_dir: Path):
     """Swap the front half by configuration. The spine never changes."""
-    from .producers import ContentUnderstandingProducer, DILayoutProducer
-
-    if name == "di-layout":
-        return DILayoutProducer(_layout_client(cache_dir))
+    from .producers import ContentUnderstandingProducer
 
     if name == "content-understanding":
         return ContentUnderstandingProducer(
-            _content_understanding_client(), analyzer_id=os.getenv("CU_ANALYZER_ID", DEFAULT_ANALYZER_ID)
+            _content_understanding_client(),
+            analyzer_id=os.getenv("CU_ANALYZER_ID", DEFAULT_ANALYZER_ID),
         )
 
     raise SystemExit(f"unknown producer {name!r}; available: {available_producers()}")
@@ -223,33 +199,6 @@ def cmd_run(args: argparse.Namespace) -> int:
     return 0 if job.status.value != "FAILED" else 1
 
 
-def cmd_bench(args: argparse.Namespace) -> int:
-    from . import bench as bench_module
-
-    producers = {}
-    for name in args.producers.split(","):
-        name = name.strip()
-        if not name:
-            continue
-        try:
-            producers[name] = _producer(name, Path(args.cache_dir))
-        except SystemExit as exc:
-            print(f"skipping {name}: {exc}", file=sys.stderr)
-        except (ImportError, KeyError) as exc:
-            print(f"skipping {name}: not configured ({exc})", file=sys.stderr)
-
-    if not producers:
-        print("no producers configured", file=sys.stderr)
-        return 2
-
-    documents = {Path(p).name: Path(p).read_bytes() for p in args.pdf}
-    rows = bench_module.run(producers, documents)
-    print(bench_module.render(rows))
-    path = bench_module.write(rows, Path(args.out))
-    print(f"\nwrote {path}")
-    return 0 if all(r.ok for r in rows) else 1
-
-
 def cmd_setup_analyzer(args: argparse.Namespace) -> int:
     """One-off: create the router and the field analyzer it routes into."""
     from .field_schema import count_fields, load_field_schema
@@ -312,7 +261,7 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--review-threshold", type=float, default=0.25)
         p.add_argument(
             "--producer",
-            default="di-layout",
+            default="content-understanding",
             help=f"segment producer; one of {available_producers()}",
         )
 
@@ -340,17 +289,6 @@ def main(argv: list[str] | None = None) -> int:
     p_tiles.add_argument("--dpi", type=int, default=300)
     p_tiles.add_argument("--point-size", type=float, default=10.0)
     p_tiles.set_defaults(func=cmd_tiles)
-
-    p_bench = sub.add_parser("bench", help="compare producers on the same corpus")
-    p_bench.add_argument("pdf", nargs="+")
-    p_bench.add_argument("--cache-dir", default=".cache")
-    p_bench.add_argument("--out", default="out")
-    p_bench.add_argument(
-        "--producers",
-        default="di-layout",
-        help=f"comma-separated; available: {','.join(available_producers())}",
-    )
-    p_bench.set_defaults(func=cmd_bench)
 
     p_setup = sub.add_parser(
         "setup-analyzer", help="one-off: create the Content Understanding router analyzer"

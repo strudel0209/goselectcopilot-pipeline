@@ -61,15 +61,12 @@ that exposed the resolution problem in §5.
 
 ## 2. What the pipeline does
 
-Nine stages, ~4,300 lines across 23 modules.
+Seven stages, 3,693 lines across 18 modules.
 
 | Stage | Input | Output | Module |
 |---|---|---|---|
-| Read | PDF bytes | One text string plus geometry for every element | `layout.py` |
-| Classify | Per-page measurements | TEXT / SCHEDULE / DRAWING per page | `segmentation.py` |
-| Group | Page labels | Segments — runs of same-type pages | `segmentation.py` |
-| Split inside pages | Table and figure geometry | Regions, by span subtraction | `regions.py` |
-| Index sections | The layout model's section tree | Heading → character offset, with document boundaries | `sections.py` |
+| Classify and split | PDF bytes | Category per page or sub-page segment, plus one text string | `producers/content_understanding.py` |
+| Index sections | The service's section tree | Heading → character offset, with document boundaries | `sections.py` |
 | Prove coverage | All spans | Assert every character is accounted for | `manifest.py` |
 | **Render drawings** | **Source PDF, chosen DPI** | **Page images the service never downsampled** | **`render.py`** |
 | Extract | One segment | Structured fields, per-type schema and model | `extractors.py` |
@@ -92,10 +89,8 @@ flowchart LR
     OUT(["JobResult to the quotation system"]):::io
 
     subgraph P1["1 - Segment | deterministic | one analyze call per file"]
-        ENG{"engine"}:::gate
-        DI["layout.py<br/>Document Intelligence Layout<br/>cached by SHA-256"]:::det
-        CU["content_understanding.py<br/>classify and split"]:::det
-        STR["sections.py + regions.py<br/>headings, document boundaries,<br/>intra-page span subtraction"]:::det
+        CU["content_understanding.py<br/>classify, split, drop PLAN,<br/>route fields by category"]:::det
+        STR["sections.py<br/>headings and document boundaries"]:::det
         MAN["manifest.py<br/>coverage proof and work items"]:::det
     end
 
@@ -114,10 +109,7 @@ flowchart LR
         MRG["assemble.py<br/>order, dedupe, precedence,<br/>conflicts, review flags"]:::det
     end
 
-    IN --> ENG
-    ENG -->|di-layout| DI
-    ENG -->|content-understanding| CU
-    DI --> STR
+    IN --> CU
     CU --> STR
     STR --> MAN
     MAN --> KIND
@@ -175,7 +167,7 @@ bounding box and a 0–1 confidence per field when
 `classify` and `generate` fields alike.
 
 **Section breadcrumbs, which no service provides.** Grounding says *where on the
-page*; a reviewer needs *which clause*. Document Intelligence's own `sections`
+page*; a reviewer needs *which clause*. The service's own `sections`
 tree supplies the hierarchy, and — critically — its root children are separate
 documents stapled into one file. On Package A the specification occupies offsets
 0–18,684 and the drawing sheets 18,708–21,911. Attribution never crosses that
@@ -235,20 +227,41 @@ Both engines, same package, same extraction models.
 | Correct drive–motor pairs | 4/4 | 4/4 |
 | Pair precision | 0.44 | 0.36 |
 
-**Delete our page classifier.** Content Understanding reached the right answer at
+**The classifier is deleted.** Content Understanding reached the right answer at
 confidence 1.00 with no training data and no tuning. Ours reached the same answer
-at 0.31 after a bug fix. That is ~200 lines of `segmentation.py` plus its tuning
-risk, gone.
+at 0.31 after a bug fix.
 
-**Keep the rest.** The layout model is twice as fast, and extraction quality is
-identical because the engine only decides how pages are split, not what is
-extracted.
+**So is the second engine.** The comparison above is kept as the record of why,
+but it is no longer runnable: the heuristic classifier could not emit `PLAN` at
+all. A scaled floor plan and a one-line diagram are both sparse bordered sheets,
+so no geometric measurement separates them — which means that path could never
+implement the plan-drop policy the customer asked for. That is a capability gap,
+not a quality gap, so keeping it as a control arm bought nothing.
+
+Removing it deleted nine files — `layout.py`, `segmentation.py`, `regions.py`,
+`geometry.py`, `producers/di_layout.py`, `bench.py`, the object-model fakes and
+two test modules — and shrank `sections.py` by 128 lines and `cli.py` by 62.
+**1,289 lines gone**, and the `azure-ai-documentintelligence` dependency with
+them. Source is down from 4,299 lines across 23 modules to 3,693 across 18.
+
+**What replaced each piece:**
+
+| Deleted | Replaced by |
+|---|---|
+| Per-page heuristic classifier | `contentCategories`, confidence 1.00 |
+| Intra-page span subtraction | `allow_in_page_segments`, measured to rescue pages 2, 3 and 5 of the combined-electrical package |
+| Hand-rolled REST client and cache | The SDK's long-running-operation poller |
+| Per-type extraction prompts for TEXT and SCHEDULE | Category-routed sub-analyzers driven by the customer's own JSON schema |
+
+**What survives, and why.** `render.py`, `tiling.py` and `models.py` stay: the
+service returns figure *descriptions* but **no image bytes** for a document, so a
+one-line diagram still has to be rasterised locally and read at native
+resolution. That is the part no vendor sells.
 
 ### What no vendor sells
 
 | Gap | Why |
 |---|---|
-| Intra-page separation | Every managed classifier's minimum unit is a page — a documented architectural limit |
 | Section breadcrumbs | Grounding answers *where on the page*, not *which clause* |
 | Native-resolution CAD reading | Every vision path downscales to a token budget |
 | Cross-region precedence | "A schedule outranks a drawing for a kW rating" is customer policy |

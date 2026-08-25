@@ -32,42 +32,7 @@ from goselect_docproc.producers.content_understanding import (
     ContentUnderstandingProducer,
     router_analyzer,
 )
-from goselect_docproc.producers.di_layout import DILayoutProducer
 from goselect_docproc.spans import overlaps
-
-
-class FakeLayout:
-    """Stands in for ``LayoutClient``: returns a canned result and a digest."""
-
-    def __init__(self, result):
-        self.result = result
-
-    def analyze(self, data, options=None):
-        return self.result, "deadbeef"
-
-
-class TestDILayoutEndToEnd:
-    """Exercises the real wiring. The adapter tests above use fakes for the
-    service; this one uses a fake for the service and the real everything else,
-    which is what catches import and signature breakage."""
-
-    def test_analyze_produces_segments_and_a_section_index(self, stapled_package_result):
-        analysis = DILayoutProducer(FakeLayout(stapled_package_result)).analyze(
-            "f1", b"%PDF-", "file:///x.pdf"
-        )
-        assert analysis.segments
-        assert analysis.content_sha256 == "deadbeef"
-        assert analysis.section_index.strategy == "di-sections"
-
-    def test_drawing_segments_never_carry_a_specification_clause(
-        self, stapled_package_result
-    ):
-        analysis = DILayoutProducer(FakeLayout(stapled_package_result)).analyze(
-            "f1", b"%PDF-", "file:///x.pdf"
-        )
-        for segment in analysis.segments:
-            if segment.content_type is ContentType.DRAWING:
-                assert segment.section_root != "SECTION 16370 VFD > 3.05 TESTS"
 
 
 class FakeCU:
@@ -318,8 +283,8 @@ class TestRouterAnalyzerDefinition:
 
 
 class TestRegistryAndCost:
-    def test_both_producers_are_registered(self):
-        assert set(available()) == {"di-layout", "content-understanding"}
+    def test_content_understanding_is_the_registered_producer(self):
+        assert set(available()) == {"content-understanding"}
 
     def test_costs_add_when_an_engine_calls_two_services(self):
         combined = ProducerCost(pages=10, api_calls=1, usd_estimate=0.10) + ProducerCost(

@@ -202,7 +202,7 @@ class Manifest(Strict):
     segments: list[Segment]
     section_index: list[SectionNode] = Field(default_factory=list)
     coverage: dict[str, Coverage] = Field(default_factory=dict)
-    producer: str = "di-layout-heuristic-v1"
+    producer: str = "content-understanding"
 
     @property
     def expected_units(self) -> int:

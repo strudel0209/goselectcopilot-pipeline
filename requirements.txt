@@ -10,7 +10,6 @@
 # allow_in_page_segments, agentic workflow, semantic chunking, inline analyze.
 azure-ai-contentunderstanding==1.2.0b3
 
-azure-ai-documentintelligence>=1.0.2
 azure-identity>=1.19.0
 
 pydantic>=2.7
