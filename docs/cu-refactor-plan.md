@@ -170,6 +170,50 @@ Two bugs this run exposed, both fixed:
   `{value, unit, details}` (75 kW -> value=75.0 unit='kW' raw='75'), so this is the source document
   or the extraction, not the mapping. Confirm against a schedule that has rating columns.
 
+## Step 4 — MEASURED 2026-08-25 (eval/inpage_bench.py, out/eval/inpage_bench.json)
+Two analyzers identical except `allow_in_page_segments`, neither routing fields, so this measures
+boundaries not extraction.
+
+**In-page segmentation earns its place, on one document out of four.**
+`98850_1_CombinedElectrical.pdf` (10 pages), stable across 3 runs:
+```
+page-level TEXT:1-1|DRAWING:2-2|SCHEDULE:3-3|DRAWING:4-4|PLAN:5-5|...|PLAN:10-10   rescued: []
+in-page    TEXT:1-1|DRAWING:2-2|SCHEDULE:2-2|DRAWING:3-3|SCHEDULE:3-3|DRAWING:4-4|
+           PLAN:5-5|TEXT:5-5|PLAN:6-7|PLAN:8-8|PLAN:9-10                            rescued: [2,3,5]
+```
+Three pages where a grid or prose block was separated from the sheet sharing it. Page 5 is the one
+that matters: that prose would have been **dropped with the plan** at page granularity.
+
+Other documents: `98813` 1 -> 3 segments (splits page 2 into TEXT + DRAWING). `98878_1` (Package A)
+and `98878_2` **identical both ways** - in-page found nothing to split. So the README's "15 of 20
+pages carry more than one content kind" is NOT reproduced by the classifier on Package A; that claim
+is about *layout elements* (regions.py granularity), which is a finer thing than a classifier
+segment. The two are complementary, not substitutes.
+
+**My stated pass criterion "collateral drops -> 0" was wrong.** It counted TEXT/SCHEDULE regions
+inside a PLAN segment, but a plan sheet always carries dimension notes, so it can never reach zero
+and improvement is invisible. Replaced with `rescued_pages`.
+
+### Determinism
+- Page-level: 3/3 identical signatures.
+- In-page: category assignments and rescued pages identical 3/3; segment COUNT varied 11/11/10.
+  The only variance is how adjacent PLAN pages group (`PLAN:8-8|PLAN:9-10` vs `PLAN:8-10`).
+- Across analyzer re-creations the same document gave 5 segments then 10 - again the difference was
+  only in how consecutive PLAN pages grouped.
+- So: **category assignment is stable; grouping of consecutive same-category pages is not.** For
+  this pipeline that instability is harmless, because plans are dropped either way. It would not be
+  harmless for a category whose segments are extracted.
+
+### What this does and does not justify
+- Turn `allow_in_page_segments` ON: it strictly adds separated content and never broke coverage
+  (unexplained_chars == 0 in every run of every configuration).
+- It does NOT justify deleting span subtraction. The CU producer's `_classify_elements` still types
+  regions inside a segment and is what the coverage proof rests on. Step 5's real scope is the
+  **DI path** (di_layout, layout, segmentation heuristic, geometry, regions), not the concept.
+- Blocked before scoring: `eval/labels/*.json` predate the taxonomy. They have no PLAN class, so a
+  correctly-identified plan scores as a misclassification against a DRAWING label. Page
+  classification F1 is invalid until the labels are re-cut.
+
 ## Refactor plan (module verdicts)
 DELETE: segmentation.py (208), regions.py (140), geometry.py (62), models.py (150),
         layout.py + producers/di_layout.py (265), hand-rolled REST client in content_understanding.py (~200),
