@@ -26,7 +26,9 @@ from azure.ai.contentunderstanding.models import (
     GenerationMethod,
 )
 
-DEFAULT_CONTRACT = Path("sample_docs/vfd_motor_schema_v1_0.json")
+# Anchored to the repository, not the working directory: a container job starts
+# wherever the runtime puts it. GOSELECT_CONTRACT is the production override.
+DEFAULT_CONTRACT = Path(__file__).resolve().parents[2] / "sample_docs" / "vfd_motor_schema_v1_0.json"
 
 # ContentFieldType, minus the containers handled structurally below.
 SCALARS = {"string", "number", "integer", "boolean", "date", "time"}

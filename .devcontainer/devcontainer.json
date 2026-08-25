@@ -11,6 +11,11 @@
     "PIP_INDEX_URL": "https://packagefeedproxy.microsoft.io/pypi/simple/",
     "PIP_DISABLE_PIP_VERSION_CHECK": "1"
   },
+  // The image ships its own pipx pytest earlier on PATH, in an environment that
+  // cannot see this project. Without this, bare `pytest` fails on imports.
+  "remoteEnv": {
+    "PATH": "${containerEnv:HOME}/.local/bin:${containerEnv:PATH}"
+  },
   "customizations": {
     "vscode": {
       "extensions": [

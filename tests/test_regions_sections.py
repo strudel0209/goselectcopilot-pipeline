@@ -77,7 +77,7 @@ class TestSectionIndex:
         assert index.reliable is False
 
     def test_bullets_are_never_promoted_to_headings(self):
-        from tests.conftest import analyze_result, page, paragraph, poly
+        from conftest import analyze_result, page, paragraph, poly
 
         result = analyze_result(
             content="x" * 200,
@@ -136,7 +136,7 @@ class TestDiSectionTree:
     def test_a_bare_root_yields_no_headings(self):
         """A one-line diagram has no structure; inventing headings is how
         handwriting and equipment labels become clauses."""
-        from tests.conftest import analyze_result, di_section, page, paragraph
+        from conftest import analyze_result, di_section, page, paragraph
 
         result = analyze_result(
             content="3 x 124 Amp",
