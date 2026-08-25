@@ -67,6 +67,19 @@ def _sources(paths: list[str]) -> dict[str, tuple[bytes, str]]:
     }
 
 
+def _run_dir(args: argparse.Namespace) -> Path:
+    """``out/runs/<package>/`` unless --out says otherwise.
+
+    A fixed default meant two runs on different documents overwrote each other
+    and the folder name said nothing about what was in it.
+    """
+    if args.out:
+        return Path(args.out)
+    stems = [Path(p).stem for p in args.pdf]
+    package = os.path.commonprefix(stems).rstrip("_-") or stems[0]
+    return Path("out/runs") / package
+
+
 def _write(output_dir: Path, name: str, payload: object) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     path = output_dir / name
@@ -107,12 +120,12 @@ def cmd_segment(args: argparse.Namespace) -> int:
     pipeline = Pipeline(
         producer=_producer(args.producer, args.analyzer_id),
         extractors={},
-        config=PipelineConfig(output_dir=Path(args.out)),
+        config=PipelineConfig(output_dir=_run_dir(args)),
     )
     manifest = pipeline.segment(_sources(args.pdf))
     _report_segments(manifest, args.review_threshold)
     failures = _report_coverage(manifest)
-    path = _write(Path(args.out), "manifest.json", manifest.model_dump(mode="json"))
+    path = _write(_run_dir(args), "manifest.json", manifest.model_dump(mode="json"))
     print(f"\nwrote {path}")
     return 1 if failures and args.strict else 0
 
@@ -121,7 +134,7 @@ def cmd_plan(args: argparse.Namespace) -> int:
     pipeline = Pipeline(
         producer=_producer(args.producer, args.analyzer_id),
         extractors={},
-        config=PipelineConfig(output_dir=Path(args.out)),
+        config=PipelineConfig(output_dir=_run_dir(args)),
     )
     manifest = pipeline.segment(_sources(args.pdf))
     items = pipeline.plan(manifest)
@@ -132,7 +145,7 @@ def cmd_plan(args: argparse.Namespace) -> int:
             f"p{item.first_page}-{item.last_page} spans={len(item.spans)} "
             f"figures={len(item.figures)} highRes={item.high_resolution} formulas={item.formulas}"
         )
-    path = _write(Path(args.out), "work_items.json", [i.model_dump(mode="json") for i in items])
+    path = _write(_run_dir(args), "work_items.json", [i.model_dump(mode="json") for i in items])
     print(f"\nwrote {path}")
     return 0
 
@@ -173,7 +186,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         producer=_producer(args.producer, args.analyzer_id),
         extractors=extractors,
         config=PipelineConfig(
-            output_dir=Path(args.out),
+            output_dir=_run_dir(args),
             max_workers=args.workers,
             review_threshold=args.review_threshold,
         ),
@@ -188,7 +201,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         f"{len(job.review_required)} needing review"
     )
 
-    out = Path(args.out)
+    out = _run_dir(args)
     _write(out, "manifest.json", manifest.model_dump(mode="json"))
     _write(out, "results.json", [r.model_dump(mode="json") for r in results])
     _write(out, "job.json", job.model_dump(mode="json"))
@@ -203,7 +216,14 @@ def cmd_run(args: argparse.Namespace) -> int:
         from .assemble import reassemble_markdown
 
         _write(out, "reassembled.md", reassemble_markdown(manifest, pipeline.content_by_file()))
-    print(f"wrote {out}/deliverable.json (GoSelect schema) and {out}/review.md (human check)")
+    print(
+        f"\nwrote {out}/\n"
+        f"  deliverable.json  the agreed GoSelect schema\n"
+        f"  review.md         the same values, for a human to check\n"
+        f"  manifest.json     segments, sections and the coverage proof\n"
+        f"  results.json      one record per segment\n"
+        f"  job.json          status, conflicts, what needs review"
+    )
     return 0 if job.status.value != "FAILED" else 1
 
 
@@ -217,7 +237,7 @@ def cmd_setup_analyzer(args: argparse.Namespace) -> int:
     )
 
     client = _content_understanding_client()
-    out = Path(args.out)
+    out = Path(args.out) / "analyzers"
     base = args.analyzer_id
 
     # Before the router: a category cannot reference an analyzer that does not exist.
@@ -228,12 +248,13 @@ def cmd_setup_analyzer(args: argparse.Namespace) -> int:
         ensure_analyzer(client, analyzer_id, analyzer)
         routes[category] = analyzer_id
         print(f"analyzer {analyzer_id} ready ({count_fields(schema)} named fields)")
-        _write(out, f"cu-fields-{category}.json", analyzer.as_dict())
+        _write(out, f"{analyzer_id}.json", analyzer.as_dict())
 
     router = router_analyzer(in_page_segments=args.in_page_segments, field_analyzer_ids=routes)
     ensure_analyzer(client, base, router)
     print(f"analyzer {base} ready, routing {routes}")
-    _write(out, "cu-router.json", router.as_dict())
+    path = _write(out, f"{base}.json", router.as_dict())
+    print(f"definitions written to {path.parent}/")
     return 0
 
 
@@ -266,7 +287,11 @@ def main(argv: list[str] | None = None) -> int:
 
     def common(p: argparse.ArgumentParser) -> None:
         p.add_argument("pdf", nargs="+")
-        p.add_argument("--out", default="out")
+        p.add_argument(
+            "--out",
+            default=None,
+            help="where results go; defaults to out/runs/<package>",
+        )
         p.add_argument("--review-threshold", type=float, default=0.25)
         p.add_argument(
             "--producer",

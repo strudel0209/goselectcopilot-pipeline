@@ -488,7 +488,30 @@ derived from it (`<id>Schedule`, `<id>Text`), so `setup-analyzer` and `run` stay
 in step as long as both see the same id. If the analyzer does not exist the CLI
 says so and names the setup command, rather than raising `ModelNotFound`.
 
-Everything under `out/` is regenerable.
+### Where results go
+
+```
+out/
+  analyzers/                       what is deployed on the Azure resource
+    goselectRouterV3.json            the router: categories and routing table
+    goselectRouterV3Schedule.json    the 22-field schedule schema
+    goselectRouterV3Text.json        the 18-field prose schema
+
+  runs/<package>/                  one folder per document package
+    deliverable.json                 the agreed GoSelect schema  <- the output
+    review.md                        the same values, for a human to check
+    manifest.json                    segments, sections, coverage proof
+    results.json                     one record per segment
+    job.json                         status, conflicts, what needs review
+```
+
+`<package>` is the shared stem of the input filenames, so two runs on different
+documents cannot overwrite each other. Override with `--out <dir>`.
+
+**`analyzers/` is configuration, `runs/` is output.** The first records what was
+deployed to Azure and changes only when you run `setup-analyzer`; the second is
+produced by every `run`. Everything under `out/` is regenerable and safe to
+delete.
 
 ---
 
