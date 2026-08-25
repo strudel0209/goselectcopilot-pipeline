@@ -32,6 +32,7 @@ from .contracts import (
     WorkItem,
 )
 from .reconcile import TagLexicon
+from .deliver import plain
 from .sections import SectionIndex
 from .spans import text_for
 from .tiling import Tile, VisionLimits, tile_image
@@ -446,6 +447,7 @@ def expand_contract(
     pairs = fields.get("vfd_motor_pairs") if hasattr(fields, "get") else None
     for index, entry in enumerate(getattr(pairs, "value_array", None) or []):
         body = _obj(entry)
+        payload.contract_rows.append(plain(entry))
         tag_node = body.get("tag")
         tag = _text(tag_node)
         if tag and context.lexicon:
@@ -503,9 +505,6 @@ def expand_contract(
                 )
             )
 
-        for note in (_text(body.get("notes")), _text(body.get("location"))):
-            if note:
-                payload.notes.append(note)
 
     if payload.pairs:
         payload.notes.append(

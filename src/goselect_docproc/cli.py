@@ -191,11 +191,18 @@ def cmd_run(args: argparse.Namespace) -> int:
     _write(out, "manifest.json", manifest.model_dump(mode="json"))
     _write(out, "results.json", [r.model_dump(mode="json") for r in results])
     _write(out, "job.json", job.model_dump(mode="json"))
+
+    from .deliver import contract_payload, review_sheet
+
+    _write(out, "deliverable.json", contract_payload(job))
+    document = ", ".join(Path(p).name for p in args.pdf)
+    (out / "review.md").write_text(review_sheet(job, document=document))
+
     if args.markdown:
         from .assemble import reassemble_markdown
 
         _write(out, "reassembled.md", reassemble_markdown(manifest, pipeline.content_by_file()))
-    print(f"wrote {out}/manifest.json, results.json, job.json")
+    print(f"wrote {out}/deliverable.json (GoSelect schema) and {out}/review.md (human check)")
     return 0 if job.status.value != "FAILED" else 1
 
 
