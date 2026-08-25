@@ -18,6 +18,8 @@ import os
 import sys
 from pathlib import Path
 
+from azure.core.exceptions import ResourceNotFoundError
+
 from .contracts import ContentType
 from .extractors import ModelExtractor, NullModel, default_extractors
 from .pipeline import Pipeline, PipelineConfig
@@ -26,14 +28,14 @@ from .producers.content_understanding import DEFAULT_ANALYZER_ID
 from .tiling import VisionLimits, assess, plan_tiles
 
 
-def _producer(name: str):
+def _producer(name: str, analyzer_id: str | None = None):
     """Swap the front half by configuration. The spine never changes."""
     from .producers import ContentUnderstandingProducer
 
     if name == "content-understanding":
         return ContentUnderstandingProducer(
             _content_understanding_client(),
-            analyzer_id=os.getenv("CU_ANALYZER_ID", DEFAULT_ANALYZER_ID),
+            analyzer_id=analyzer_id or os.getenv("CU_ANALYZER_ID", DEFAULT_ANALYZER_ID),
         )
 
     raise SystemExit(f"unknown producer {name!r}; available: {available_producers()}")
@@ -103,7 +105,7 @@ def _report_segments(manifest, threshold: float) -> None:
 
 def cmd_segment(args: argparse.Namespace) -> int:
     pipeline = Pipeline(
-        producer=_producer(args.producer),
+        producer=_producer(args.producer, args.analyzer_id),
         extractors={},
         config=PipelineConfig(output_dir=Path(args.out)),
     )
@@ -117,7 +119,7 @@ def cmd_segment(args: argparse.Namespace) -> int:
 
 def cmd_plan(args: argparse.Namespace) -> int:
     pipeline = Pipeline(
-        producer=_producer(args.producer),
+        producer=_producer(args.producer, args.analyzer_id),
         extractors={},
         config=PipelineConfig(output_dir=Path(args.out)),
     )
@@ -168,7 +170,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             vision_limits=limits,
         )
     pipeline = Pipeline(
-        producer=_producer(args.producer),
+        producer=_producer(args.producer, args.analyzer_id),
         extractors=extractors,
         config=PipelineConfig(
             output_dir=Path(args.out),
@@ -271,6 +273,12 @@ def main(argv: list[str] | None = None) -> int:
             default="content-understanding",
             help=f"segment producer; one of {available_producers()}",
         )
+        p.add_argument(
+            "--analyzer-id",
+            default=None,
+            help="Content Understanding router; defaults to $CU_ANALYZER_ID "
+            f"then {DEFAULT_ANALYZER_ID}",
+        )
 
     p_segment = sub.add_parser("segment", help="segment only; no model spend")
     common(p_segment)
@@ -317,7 +325,22 @@ def main(argv: list[str] | None = None) -> int:
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(levelname)s %(name)s: %(message)s",
     )
-    return args.func(args)
+    try:
+        return args.func(args)
+    except ResourceNotFoundError as exc:
+        if "ModelNotFound" not in str(exc):
+            raise
+        wanted = getattr(args, "analyzer_id", None) or os.getenv(
+            "CU_ANALYZER_ID", DEFAULT_ANALYZER_ID
+        )
+        print(
+            f"analyzer {wanted!r} does not exist on this resource.\n"
+            f"Create it, or point at one that exists:\n"
+            f"  goselect-docproc setup-analyzer --analyzer-id {wanted}\n"
+            f"  ...or set CU_ANALYZER_ID in .env, or pass --analyzer-id",
+            file=sys.stderr,
+        )
+        return 2
 
 
 if __name__ == "__main__":

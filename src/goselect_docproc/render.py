@@ -23,7 +23,7 @@ DEFAULT_DPI = 300
 def render_page(data: bytes, page_number: int, dpi: int = DEFAULT_DPI) -> bytes | None:
     """Render one 1-based PDF page to PNG bytes at ``dpi``."""
     try:
-        import fitz
+        import pymupdf as fitz
     except ImportError:  # pragma: no cover - pymupdf is an optional extra
         log.warning("pymupdf not installed; falling back to service figure crops")
         return None

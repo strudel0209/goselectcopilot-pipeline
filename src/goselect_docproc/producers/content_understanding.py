@@ -44,7 +44,7 @@ FURNITURE_ROLES = {"pageHeader", "pageFooter", "pageNumber"}
 
 USD_PER_PAGE = 0.010
 
-DEFAULT_ANALYZER_ID = "goselectRouter"
+DEFAULT_ANALYZER_ID = "goselectRouterV3"
 
 # gpt-4.1 retires October 2026. Measured equal to the flagship on specification
 # prose, so the mini is the default here too.

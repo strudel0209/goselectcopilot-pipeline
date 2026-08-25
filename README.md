@@ -10,11 +10,14 @@ drawn.
 
 ```bash
 pip install --user -e .[dev]
-cp .env.example .env && az login
+cp .env.example .env && az login       # then set CONTENTUNDERSTANDING_ENDPOINT
 
-goselect-docproc setup-analyzer --analyzer-id goselectRouterV3   # once
+goselect-docproc setup-analyzer        # once: deploys the router + 2 sub-analyzers
 goselect-docproc run sample_docs/98624_1_VFDSchedule.pdf --out out/run
 ```
+
+Both commands default to the same analyzer id (`$CU_ANALYZER_ID`, else
+`goselectRouterV3`). To use a different one, pass `--analyzer-id` to *both*.
 
 That writes `out/run/deliverable.json` (the agreed schema, for the quotation
 system) and `out/run/review.md` (the same values as a table a person can check).
@@ -470,7 +473,7 @@ pytest -q                 # 142 tests, no cloud calls, no spend
 
 | Command | Cost | Purpose |
 |---|---|---|
-| `setup-analyzer --analyzer-id <id>` | none | Deploy the two field analyzers, then the router. Run once per schema change |
+| `setup-analyzer` | none | Deploy the two field analyzers, then the router. Run once per schema change |
 | `segment <pdf>...` | one analyze call per file | Categories, regions and the coverage proof |
 | `plan <pdf>...` | one analyze call per file | The exact queue messages that would be sent |
 | `run <pdf>... [--model <deployment>]` | analyze + model | Full pipeline → `deliverable.json`, `review.md` |
@@ -479,8 +482,13 @@ pytest -q                 # 142 tests, no cloud calls, no spend
 | `python eval/score.py` | none | The scorecard, exits non-zero on a failed gate |
 | `python eval/inpage_bench.py` | analyze calls | Page-level vs in-page segmentation |
 
-Analyzer ids come from `CU_ANALYZER_ID`; the field analyzers are derived from it
-(`<id>Schedule`, `<id>Text`). Everything under `out/` is regenerable.
+Every command that reaches the service takes `--analyzer-id`, defaulting to
+`$CU_ANALYZER_ID` and then to `goselectRouterV3`. The two field analyzers are
+derived from it (`<id>Schedule`, `<id>Text`), so `setup-analyzer` and `run` stay
+in step as long as both see the same id. If the analyzer does not exist the CLI
+says so and names the setup command, rather than raising `ModelNotFound`.
+
+Everything under `out/` is regenerable.
 
 ---
 
