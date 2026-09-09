@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import pytest
 
-from goselect_docproc.reconcile import TagLexicon, harvest, normalise, signature
 from goselect_docproc.tiling import (
     VisionLimits,
     assess,
@@ -10,80 +9,6 @@ from goselect_docproc.tiling import (
     plan_tiles,
     visual_tokens,
 )
-
-
-class TestNormalise:
-    @pytest.mark.parametrize(
-        "raw,expected",
-        [
-            (r"$\sqrt{150-401}$", "150-401"),
-            (r"$\sqrt{15D-721}$", "15D-721"),
-            ("VFD-401", "VFD-401"),
-            (" vfd-401 ", "VFD-401"),
-            ("V F D - 4 0 1", "VFD-401"),
-        ],
-    )
-    def test_strips_latex_and_layout_noise(self, raw, expected):
-        assert normalise(raw) == expected
-
-
-class TestConfusionSignature:
-    def test_observed_abb_corruption_shares_a_signature(self):
-        assert signature("VFD-401") == signature("150-401")
-
-    def test_distinct_tags_do_not_collide(self):
-        assert signature("VFD-401") != signature("VFD-402")
-
-
-class TestLexicon:
-    @pytest.fixture
-    def lexicon(self):
-        return TagLexicon({"VFD-401", "VFD-721", "VFD-711", "VFD-821", "M-401"})
-
-    def test_harvest_finds_tags_in_schedule_text(self):
-        found = harvest(["| Tag | kW |", "| VFD-401 | 75 |", "| M-401 | 75 |"])
-        assert found == {"VFD-401", "M-401"}
-
-    def test_harvest_finds_letter_suffixed_tags_from_the_howey_oneline(self):
-        found = harvest(["VFD-H1", "VFD-H3", "VFD-J4", "SWBD-1", "WELL NO.5"])
-        assert {"VFD-H1", "VFD-H3", "VFD-J4"} <= found
-
-    def test_harvest_still_rejects_numeric_ranges(self):
-        assert harvest(["rated 10-20 A, 100-200 V"]) == set()
-
-    def test_exact_match_is_untouched(self, lexicon):
-        repair = lexicon.snap("VFD-401")
-        assert repair.value == "VFD-401" and repair.method == "exact"
-
-    @pytest.mark.parametrize(
-        "raw,expected",
-        [
-            (r"$\sqrt{150-401}$", "VFD-401"),
-            (r"$\sqrt{150-711}$", "VFD-711"),
-            (r"$\sqrt{15D-721}$", "VFD-721"),
-        ],
-    )
-    def test_repairs_the_exact_corruptions_seen_on_the_abb_drawing(self, lexicon, raw, expected):
-        repair = lexicon.snap(raw)
-        assert repair.value == expected
-        assert repair.method == "confusion-class"
-
-    def test_unknown_tag_is_left_alone_not_snapped_to_a_neighbour(self, lexicon):
-        """VFD-101 scores ~86%% against VFD-401. Rewriting it would be data loss."""
-        repair = lexicon.snap("VFD-101")
-        assert repair.value == "VFD-101"
-        assert repair.method in {"unchanged", "ambiguous"}
-
-    def test_ambiguity_is_reported_rather_than_guessed(self):
-        lexicon = TagLexicon({"VFD-401", "1FD-401"})
-        repair = lexicon.snap(r"$\sqrt{150-401}$")
-        assert repair.method == "ambiguous"
-        assert repair.confidence == 0.0
-        assert len(repair.ambiguous_with) == 2
-
-    def test_empty_lexicon_never_invents_a_tag(self):
-        repair = TagLexicon(set()).snap("VFD-401")
-        assert repair.value == "VFD-401" and repair.confidence == 0.0
 
 
 class TestVisionBudget:

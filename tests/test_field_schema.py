@@ -1,85 +1,57 @@
-"""The agreed contract, converted to a Content Understanding field schema.
-
-The customer's JSON Schema is the artefact they sign. These tests pin the
-conversion rules that a signature cannot express.
-"""
-
-from __future__ import annotations
+import re
 
 import pytest
-from azure.ai.contentunderstanding.models import GenerationMethod
+from azure.ai.contentunderstanding.models import ContentFieldSchema
+from jsonschema import validate
 
 from goselect_docproc.field_schema import (
-    contract_path,
-    count_fields,
-    load_contract,
-    load_field_schema,
-    to_field_schema,
+    empty_contract_row, extraction_schema, flat_fields, get_field, load_contract,
+    load_field_schema, native_field_paths, scope_paths, set_field,
 )
 
 
-@pytest.fixture(scope="module")
-def schema():
-    return load_field_schema()
+def test_every_customer_leaf_round_trips_without_a_mapping_table():
+    row = empty_contract_row()
+    for path, definition in flat_fields().items():
+        kinds = definition["type"]
+        value = ["stated"] if kinds == "array" else 7 if "number" in kinds else "stated"
+        set_field(row, path, value)
+        assert get_field(row, path) == value
+    validate({"vfd_motor_pairs": [row]}, load_contract()["json_schema"])
 
 
-def leaf(schema, *path):
-    node = schema.fields[path[0]]
-    for step in path[1:]:
-        node = node.item_definition if step == "[]" else node.properties[step]
-    return node
+def test_schema_is_native_and_covers_every_customer_field():
+    restored = ContentFieldSchema(load_field_schema().as_dict())
+    encoded = restored.fields["rows"].item_definition.properties
+    assert set(encoded) == set(native_field_paths())
+    assert all(re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name) for name in encoded)
+    assert "motor__electrical__voltage__value" in encoded
+    properties = {native_field_paths()[name]: definition for name, definition in encoded.items()}
+    assert set(flat_fields()) <= set(properties)
+    assert properties["motor.electrical.service_factor.value"].type == "number"
+    assert properties["motor.electrical.voltage.value"].type == "string"
+    assert properties["vfd.features"].type == "array"
+    assert "Motor nameplate power" in properties["motor.electrical.power_rating.value"].description
+    assert properties["motor.electrical.power_rating.value"].method == "extract"
 
 
-class TestContractConversion:
-    def test_the_customer_contract_is_the_source(self):
-        contract = load_contract()
-        assert contract["schema_name"] == "vfd_motor_schema"
-        assert contract_path().exists()
+def test_scope_is_metadata_and_cannot_authorize_motor_or_quantity_fields():
+    assert all(path.startswith("vfd.") for path in scope_paths())
+    assert "vfd.quantity" not in scope_paths()
+    assert "vfd.electrical.input_voltage" in scope_paths()
+    assert "all_vfds_scope" not in str(load_contract())
+    assert extraction_schema()["additionalProperties"] is False
 
-    def test_the_root_is_the_pair_list(self, schema):
-        assert list(schema.fields) == ["vfd_motor_pairs"]
-        assert schema.fields["vfd_motor_pairs"].type == "array"
 
-    def test_nesting_survives_to_the_leaf(self, schema):
-        node = leaf(schema, "vfd_motor_pairs", "[]", "vfd", "electrical", "input_voltage", "value")
-        assert node.method == GenerationMethod.EXTRACT
-        assert node.description
+def test_new_contract_fields_are_not_lost_by_flattening():
+    assert flat_fields({"type": "object", "properties": {
+        "new_field": {"type": ["string", "null"], "description": "New customer field"},
+    }})["new_field"]["description"] == "new_field: New customer field"
 
-    def test_unions_collapse_to_string_so_480_277_survives(self, schema):
-        """The contract declares number|string for exactly this reason."""
-        node = leaf(schema, "vfd_motor_pairs", "[]", "vfd", "electrical", "input_voltage", "value")
-        assert node.type == "string"
 
-    def test_a_plain_number_stays_a_number(self, schema):
-        node = leaf(schema, "vfd_motor_pairs", "[]", "vfd", "quantity")
-        assert node.type == "number"
-
-    def test_every_leaf_is_extracted_never_generated(self, schema):
-        """A generated value has no place on a page, so it cannot be reviewed."""
-
-        def check(node):
-            if node.type == "object":
-                for child in (node.properties or {}).values():
-                    check(child)
-            elif node.type == "array":
-                check(node.item_definition)
-            else:
-                assert node.method == GenerationMethod.EXTRACT
-
-        for field in schema.fields.values():
-            check(field)
-
-    def test_it_fits_the_service_limit(self, schema):
-        assert count_fields(schema) <= 1000
-
-    def test_nulls_are_dropped_rather_than_typed(self):
-        converted = to_field_schema(
-            {"json_schema": {"properties": {"tag": {"type": ["string", "null"]}}}}
-        )
-        assert converted.fields["tag"].type == "string"
-
-    def test_enums_are_carried_across(self):
-        converted = to_field_schema(
-            {"json_schema": {"properties": {"kind": {"type": "string", "enum": ["A", "B", None]}}}}
-        )
-        assert converted.fields["kind"].enum == ["A", "B"]
+def test_native_name_collisions_fail_instead_of_losing_fields(monkeypatch):
+    monkeypatch.setattr("goselect_docproc.field_schema.flat_fields", lambda: {
+        "example.value": {"type": "string"}, "example__value": {"type": "string"},
+    })
+    with pytest.raises(ValueError, match="collide"):
+        native_field_paths()

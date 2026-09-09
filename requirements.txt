@@ -11,12 +11,12 @@
 azure-ai-contentunderstanding==1.2.0b3
 
 azure-identity>=1.19.0
+openai>=2.46.0,<3
+jsonschema>=4.23
 
 pydantic>=2.7
 python-dotenv>=1.0.1
-rapidfuzz>=3.9.0
 
-# Drawing extraction is not optional: render.py rasterises the source PDF
-# because no service returns legible figure bytes for an E-size sheet.
+# Local rendering and source-region masking for the drawing fallback.
 pymupdf>=1.24.0
 pillow>=10.3.0

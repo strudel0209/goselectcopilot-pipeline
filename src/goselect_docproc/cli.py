@@ -1,12 +1,12 @@
 """Command line entry point.
 
-    goselect-docproc segment  <pdf>...   # manifest + coverage, no model spend
+    goselect-docproc segment  <pdf>...   # manifest + markdown coverage
     goselect-docproc plan     <pdf>...   # the queue messages that would be sent
     goselect-docproc run      <pdf>...   # full pipeline
     goselect-docproc tiles    <w> <h>    # vision legibility budget for a drawing
 
-``segment`` and ``plan`` cost one analyze call per file and nothing else, so they
-are safe to run repeatedly while tuning.
+``segment`` and ``plan`` submit one paid CU analysis per file on every run.
+``run`` also makes separate model requests for drawings when configured.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ import logging
 import os
 import sys
 from pathlib import Path
+from uuid import uuid4
 
 from azure.core.exceptions import ResourceNotFoundError
 
@@ -24,7 +25,7 @@ from .contracts import ContentType
 from .extractors import ModelExtractor, NullModel, default_extractors
 from .pipeline import Pipeline, PipelineConfig
 from .producers import available as available_producers
-from .producers.content_understanding import DEFAULT_ANALYZER_ID
+from .producers.content_understanding import DEFAULT_ANALYZER_ID, DEFAULT_COMPLETION_MODEL
 from .tiling import VisionLimits, assess, plan_tiles
 
 
@@ -33,9 +34,13 @@ def _producer(name: str, analyzer_id: str | None = None):
     from .producers import ContentUnderstandingProducer
 
     if name == "content-understanding":
+        from .producers.content_understanding import analyzer_configuration
+
+        client = _content_understanding_client()
+        chosen_id = analyzer_id or os.getenv("CU_ANALYZER_ID", DEFAULT_ANALYZER_ID)
+        analyzer_configuration(client, chosen_id)
         return ContentUnderstandingProducer(
-            _content_understanding_client(),
-            analyzer_id=analyzer_id or os.getenv("CU_ANALYZER_ID", DEFAULT_ANALYZER_ID),
+            client, analyzer_id=chosen_id,
         )
 
     raise SystemExit(f"unknown producer {name!r}; available: {available_producers()}")
@@ -57,7 +62,9 @@ def _content_understanding_client():
         from azure.identity import DefaultAzureCredential
 
         credential = DefaultAzureCredential()
-    return ContentUnderstandingClient(endpoint=endpoint, credential=credential)
+    return ContentUnderstandingClient(
+        endpoint=endpoint, credential=credential, api_version="2026-06-01-preview",
+    )
 
 
 def _sources(paths: list[str]) -> dict[str, tuple[bytes, str]]:
@@ -68,16 +75,12 @@ def _sources(paths: list[str]) -> dict[str, tuple[bytes, str]]:
 
 
 def _run_dir(args: argparse.Namespace) -> Path:
-    """``out/runs/<package>/`` unless --out says otherwise.
-
-    A fixed default meant two runs on different documents overwrote each other
-    and the folder name said nothing about what was in it.
-    """
+    """A unique run directory unless --out explicitly chooses a reusable path."""
     if args.out:
         return Path(args.out)
     stems = [Path(p).stem for p in args.pdf]
     package = os.path.commonprefix(stems).rstrip("_-") or stems[0]
-    return Path("out/runs") / package
+    return Path("out/runs") / package / str(uuid4())
 
 
 def _write(output_dir: Path, name: str, payload: object) -> Path:
@@ -117,24 +120,26 @@ def _report_segments(manifest, threshold: float) -> None:
 
 
 def cmd_segment(args: argparse.Namespace) -> int:
+    out = _run_dir(args)
     pipeline = Pipeline(
         producer=_producer(args.producer, args.analyzer_id),
         extractors={},
-        config=PipelineConfig(output_dir=_run_dir(args)),
+        config=PipelineConfig(output_dir=out),
     )
     manifest = pipeline.segment(_sources(args.pdf))
     _report_segments(manifest, args.review_threshold)
     failures = _report_coverage(manifest)
-    path = _write(_run_dir(args), "manifest.json", manifest.model_dump(mode="json"))
+    path = _write(out, "manifest.json", manifest.model_dump(mode="json"))
     print(f"\nwrote {path}")
     return 1 if failures and args.strict else 0
 
 
 def cmd_plan(args: argparse.Namespace) -> int:
+    out = _run_dir(args)
     pipeline = Pipeline(
         producer=_producer(args.producer, args.analyzer_id),
         extractors={},
-        config=PipelineConfig(output_dir=_run_dir(args)),
+        config=PipelineConfig(output_dir=out),
     )
     manifest = pipeline.segment(_sources(args.pdf))
     items = pipeline.plan(manifest)
@@ -145,13 +150,13 @@ def cmd_plan(args: argparse.Namespace) -> int:
             f"p{item.first_page}-{item.last_page} spans={len(item.spans)} "
             f"figures={len(item.figures)} highRes={item.high_resolution} formulas={item.formulas}"
         )
-    path = _write(_run_dir(args), "work_items.json", [i.model_dump(mode="json") for i in items])
+    path = _write(out, "work_items.json", [i.model_dump(mode="json") for i in items])
     print(f"\nwrote {path}")
     return 0
 
 
 def _model(name: str | None):
-    """``None`` keeps the pipeline runnable end to end with no spend."""
+    """``None`` disables separate model requests, not CU analysis charges."""
     if not name:
         return NullModel()
 
@@ -168,25 +173,15 @@ def _model(name: str | None):
 
 
 def cmd_run(args: argparse.Namespace) -> int:
-    model = _model(args.model)
-    if args.standard_tier:
-        limits = VisionLimits.standard()
-    elif args.model or args.drawing_model:
-        limits = VisionLimits.azure_openai()
-    else:
-        limits = VisionLimits.high_resolution()
+    out = _run_dir(args)
+    model = _model(args.drawing_model)
+    limits = VisionLimits.azure_openai()
     extractors = default_extractors(model, limits)
-    if args.drawing_model:
-        extractors[ContentType.DRAWING] = ModelExtractor(
-            content_type=ContentType.DRAWING,
-            model=_model(args.drawing_model),
-            vision_limits=limits,
-        )
     pipeline = Pipeline(
         producer=_producer(args.producer, args.analyzer_id),
         extractors=extractors,
         config=PipelineConfig(
-            output_dir=_run_dir(args),
+            output_dir=out,
             max_workers=args.workers,
             review_threshold=args.review_threshold,
         ),
@@ -201,7 +196,6 @@ def cmd_run(args: argparse.Namespace) -> int:
         f"{len(job.review_required)} needing review"
     )
 
-    out = _run_dir(args)
     _write(out, "manifest.json", manifest.model_dump(mode="json"))
     _write(out, "results.json", [r.model_dump(mode="json") for r in results])
     _write(out, "job.json", job.model_dump(mode="json"))
@@ -220,16 +214,16 @@ def cmd_run(args: argparse.Namespace) -> int:
         f"\nwrote {out}/\n"
         f"  deliverable.json  the agreed GoSelect schema\n"
         f"  review.md         the same values, for a human to check\n"
-        f"  manifest.json     segments, sections and the coverage proof\n"
+        f"  manifest.json     segments, sections and markdown coverage\n"
         f"  results.json      one record per segment\n"
         f"  job.json          status, conflicts, what needs review"
     )
-    return 0 if job.status.value != "FAILED" else 1
+    return 0 if job.status.value == "DONE" else 1
 
 
 def cmd_setup_analyzer(args: argparse.Namespace) -> int:
-    """One-off: create the per-category field analyzers, then the router."""
-    from .field_schema import count_fields, schedule_schema, text_schema
+    """Explicitly replace one shared field analyzer and its router."""
+    from .field_schema import flat_fields, load_field_schema
     from .producers.content_understanding import (
         ensure_analyzer,
         field_analyzer,
@@ -239,18 +233,24 @@ def cmd_setup_analyzer(args: argparse.Namespace) -> int:
     client = _content_understanding_client()
     out = Path(args.out) / "analyzers"
     base = args.analyzer_id
+    completion_model = args.completion_model
+    deployment = (client.get_defaults().model_deployments or {}).get(completion_model)
+    if not deployment or (os.getenv("REPORT_MODEL") and deployment != os.environ["REPORT_MODEL"]):
+        raise SystemExit(
+            f"CU model {completion_model!r} needs a resource mapping to the intended deployment; "
+            "use --completion-model for its logical model identifier"
+        )
 
-    # Before the router: a category cannot reference an analyzer that does not exist.
-    routes = {}
-    for category, schema in (("schedule", schedule_schema()), ("text", text_schema())):
-        analyzer_id = f"{base}{category.capitalize()}"
-        analyzer = field_analyzer(schema)
-        ensure_analyzer(client, analyzer_id, analyzer)
-        routes[category] = analyzer_id
-        print(f"analyzer {analyzer_id} ready ({count_fields(schema)} named fields)")
-        _write(out, f"{analyzer_id}.json", analyzer.as_dict())
+    analyzer_id = f"{base}Fields"
+    analyzer = field_analyzer(load_field_schema(), completion_model)
+    ensure_analyzer(client, analyzer_id, analyzer)
+    routes = {category: analyzer_id for category in ("text", "schedule")}
+    print(f"analyzer {analyzer_id} ready ({len(flat_fields())} customer fields plus extraction metadata)")
+    _write(out, f"{analyzer_id}.json", analyzer.as_dict())
 
-    router = router_analyzer(in_page_segments=args.in_page_segments, field_analyzer_ids=routes)
+    router = router_analyzer(
+        completion_model, in_page_segments=args.in_page_segments, field_analyzer_ids=routes,
+    )
     ensure_analyzer(client, base, router)
     print(f"analyzer {base} ready, routing {routes}")
     path = _write(out, f"{base}.json", router.as_dict())
@@ -290,7 +290,7 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument(
             "--out",
             default=None,
-            help="where results go; defaults to out/runs/<package>",
+            help="where results go; defaults to out/runs/<package>/<run-id>",
         )
         p.add_argument("--review-threshold", type=float, default=0.25)
         p.add_argument(
@@ -305,7 +305,7 @@ def main(argv: list[str] | None = None) -> int:
             f"then {DEFAULT_ANALYZER_ID}",
         )
 
-    p_segment = sub.add_parser("segment", help="segment only; no model spend")
+    p_segment = sub.add_parser("segment", help="segment only; paid CU analysis")
     common(p_segment)
     p_segment.add_argument("--strict", action="store_true", help="exit 1 on unexplained content loss")
     p_segment.set_defaults(func=cmd_segment)
@@ -317,9 +317,7 @@ def main(argv: list[str] | None = None) -> int:
     p_run = sub.add_parser("run", help="full pipeline")
     common(p_run)
     p_run.add_argument("--workers", type=int, default=4)
-    p_run.add_argument("--model", default=None, help="Foundry deployment name; omit for zero-spend NullModel")
-    p_run.add_argument("--drawing-model", default=None, help="override the deployment used for DRAWING segments")
-    p_run.add_argument("--standard-tier", action="store_true", help="model without high-res vision")
+    p_run.add_argument("--drawing-model", default=os.getenv("REPORT_DRAWING_MODEL"), help="drawing deployment; defaults to REPORT_DRAWING_MODEL; missing model fails drawing segments")
     p_run.add_argument("--markdown", action="store_true", help="also emit reassembled.md")
     p_run.set_defaults(func=cmd_run)
 
@@ -335,14 +333,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_setup.add_argument("--analyzer-id", default=os.getenv("CU_ANALYZER_ID", DEFAULT_ANALYZER_ID))
     p_setup.add_argument(
-        "--contract", default=None, help="path to the agreed extraction contract JSON"
-    )
-    p_setup.add_argument(
-        "--no-in-page-segments",
-        dest="in_page_segments",
-        action="store_false",
-        help="one segment per page; a grid sharing a sheet with a diagram is then "
-        "classified as the diagram and never extracted",
+        "--completion-model", default=os.getenv("REPORT_MODEL", DEFAULT_COMPLETION_MODEL),
+        help="logical CU model identifier mapped to a deployment in resource defaults",
     )
     p_setup.set_defaults(in_page_segments=True)
     p_setup.add_argument("--out", default="out")

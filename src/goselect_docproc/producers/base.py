@@ -28,7 +28,7 @@ from typing import Any, Protocol, runtime_checkable
 
 from ..contracts import Coverage, Segment, Span
 from ..sections import SectionIndex
-from ..spans import gaps, is_benign_gap, overlaps, total
+from ..spans import gaps, is_benign_gap, subtract, total
 
 
 @dataclass(frozen=True)
@@ -72,29 +72,28 @@ class DocumentAnalysis:
     the producer routes categories to a field analyzer."""
     furniture_spans: list[Span] = field(default_factory=list)
     native: Any = None
+    response: Any = None
+    usage: dict[str, Any] = field(default_factory=dict)
+    cache_hit: bool = False
     warnings: list[str] = field(default_factory=list)
 
     def coverage(self) -> Coverage:
-        """The loss proof. Identical maths whatever produced the segments.
-
-        Furniture is whatever the producer **declares** it dropped, plus markup
-        recognisable as furniture. Declaration matters because Document
-        Intelligence wraps headers in HTML comments while Mistral returns them
-        as plain text with a block label - text sniffing alone would count the
-        latter as content loss.
-        """
+        """Account for returned markdown, not completeness of the original PDF."""
         claimed = [s.as_tuple() for seg in self.segments for r in seg.regions for s in r.spans]
         declared = [s.as_tuple() for s in self.furniture_spans]
         furniture = unexplained = 0
         samples: list[str] = []
         for offset, length in gaps(len(self.content), claimed):
-            text = self.content[offset : offset + length]
-            if is_benign_gap(text) or overlaps([(offset, length)], declared):
-                furniture += length
-            else:
-                unexplained += length
-                if len(samples) < 5:
-                    samples.append(text[:160])
+            remaining = subtract([(offset, length)], declared)
+            furniture += length - total(remaining)
+            for start, size in remaining:
+                text = self.content[start : start + size]
+                if is_benign_gap(text):
+                    furniture += size
+                else:
+                    unexplained += size
+                    if len(samples) < 5:
+                        samples.append(text[:160])
         return Coverage(
             total_chars=len(self.content),
             covered_chars=total(claimed),

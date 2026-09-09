@@ -83,6 +83,8 @@ def work_items(
                     for s in r.spans
                 ],
                 section_root=segment.section_root,
+                source=segment.source,
+                source_unit=segment.source_unit,
                 layout_uri=layout_uri_template.format(
                     job_id=manifest.job_id, file_id=segment.file_id
                 ),

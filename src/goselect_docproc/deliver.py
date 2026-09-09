@@ -1,198 +1,64 @@
-"""The customer-facing end of the pipeline.
+"""Customer JSON and readable review from the same already-assembled records."""
 
-Everything upstream speaks the domain model in ``contracts``. GoSelect speaks
-``sample_docs/vfd_motor_schema_v1_0.json``. This module is the one place that
-translates outward, plus a review sheet a person can actually read.
+from copy import deepcopy
 
-Two artefacts, because two audiences:
+from jsonschema import validate
 
-``deliverable.json``
-    Exactly the agreed schema, nothing added. This is what GoSelect consumes.
-
-``review.md``
-    The same values with page, confidence and section for each one, and a marker
-    on anything below the review line. This is what a proposals engineer opens to
-    decide whether the answer is right.
-
-A field the pipeline could not fill is emitted as ``null`` rather than omitted or
-guessed: a missing rating and an unread rating must not look the same.
-"""
-
-from __future__ import annotations
-
-from collections import OrderedDict
-from typing import Any
-
+from .assemble import has_value, reading_paths
 from .contracts import JobResult
-
-REVIEW_LINE = 0.80
-"""Fields below this are marked for a human. See ``PipelineConfig``."""
+from .field_schema import get_field, load_contract
 
 
-VALUE_KEYS = (
-    "value_string",
-    "value_number",
-    "value_integer",
-    "value_boolean",
-    "value_date",
-    "value_time",
-)
+def contract_payload(result: JobResult) -> dict:
+    payload = {"vfd_motor_pairs": [deepcopy(record.row) for record in result.systems]}
+    validate(payload, load_contract()["json_schema"])
+    return payload
 
 
-def plain(node: Any) -> Any:
-    """A service field node -> plain JSON in the agreed schema's own shape.
-
-    Unwraps ``valueObject``/``valueArray``/``valueString`` and nothing else. A
-    leaf the service left empty becomes ``None``, so an unread rating and an
-    absent rating stay distinguishable downstream.
-    """
-    if node is None:
-        return None
-    obj = getattr(node, "value_object", None)
-    if obj:
-        return {k: plain(v) for k, v in obj.items()}
-    arr = getattr(node, "value_array", None)
-    if arr is not None:
-        return [plain(v) for v in arr]
-    for key in VALUE_KEYS:
-        value = getattr(node, key, None)
-        if value is not None:
-            return value
-    return None
+def display_value(value) -> str:
+    if isinstance(value, dict):
+        reading = " ".join(str(value[key]) for key in ("value", "unit") if value.get(key) is not None)
+        return "; ".join(dict.fromkeys(part for part in [reading, value.get("details"), value.get("reference")] if part))
+    if isinstance(value, list):
+        return ", ".join(map(str, value))
+    return str(value)
 
 
-def confidence_of(node: Any) -> float | None:
-    return getattr(node, "confidence", None)
-
-
-def _merge_rows(rows: list[dict], sources: list[str] | None = None) -> list[dict]:
-    """Reconcile the same tag *across* segments; never within one.
-
-    Two rows of one schedule are two pieces of equipment, however similar. On the
-    Colbert package all three drives sit under one "FED FROM" value of MCC-FB, so
-    merging by tag alone collapsed three drives into one. A tag is only a join key
-    between segments - a specification clause and the schedule row it describes.
-    """
-    sources = sources or [""] * len(rows)
-    merged: list[dict] = []
-    seen: dict[str, int] = {}
-    for row, source in zip(rows, sources):
-        tag = row.get("tag")
-        key = f"{tag}" if tag else None
-        index = seen.get(key) if key else None
-        if index is not None and merged[index]["__source"] != source:
-            _fill(merged[index], row)
-            continue
-        merged.append(dict(row, __source=source))
-        if key:
-            seen[key] = len(merged) - 1
-    for row in merged:
-        row.pop("__source", None)
-    # A row the extractor filled with nothing tells a reviewer nothing.
-    return [row for row in merged if _populated(row)]
-
-
-def _fill(target: dict, incoming: dict) -> None:
-    for key, value in incoming.items():
-        if target.get(key) is None:
-            target[key] = value
-        elif isinstance(value, dict) and isinstance(target.get(key), dict):
-            _fill(target[key], value)
-
-
-def _populated(node: Any) -> int:
-    """How many leaves actually carry a value."""
-    if isinstance(node, dict):
-        return sum(_populated(v) for v in node.values())
-    if isinstance(node, list):
-        return sum(_populated(v) for v in node)
-    return 0 if node is None or node == "" else 1
-
-
-def contract_payload(result: JobResult) -> dict[str, Any]:
-    """The agreed GoSelect schema, built from the service's own rows."""
-    return {
-        "vfd_motor_pairs": _merge_rows(
-            result.payload.contract_rows, result.payload.contract_row_sources
-        )
-    }
-
-
-def _flatten(node: Any, prefix: str = "") -> list[tuple[str, Any]]:
-    """Leaf paths and values, for a flat human-readable table."""
-    out: list[tuple[str, Any]] = []
-    if isinstance(node, dict):
-        for key, value in node.items():
-            out += _flatten(value, f"{prefix} / {key}" if prefix else key)
-    elif isinstance(node, list):
-        if node:
-            out.append((prefix, ", ".join(str(v) for v in node if v is not None)))
-    else:
-        out.append((prefix, node))
-    return out
-
-
-LABELS = {
-    "vfd / electrical / power_rating": "Drive power",
-    "vfd / electrical / input_voltage": "Drive input voltage",
-    "vfd / electrical / output_current": "Drive output current",
-    "vfd / product_name": "Drive product",
-    "vfd / manufacturer": "Drive manufacturer",
-    "vfd / model_number": "Drive model",
-    "motor / electrical / power_rating": "Motor power",
-    "motor / electrical / voltage": "Motor voltage",
-    "motor / electrical / speed": "Motor speed",
-}
+def cell(value) -> str:
+    return str(value).replace("|", "\\|").replace("\n", "<br>")
 
 
 def review_sheet(result: JobResult, *, document: str = "") -> str:
-    """A sheet a proposals engineer can check without reading JSON."""
-    rows = _merge_rows(result.payload.contract_rows, result.payload.contract_row_sources)
-    leaves = sum(len(_flatten(r)) for r in rows)
-    filled = sum(_populated(r) for r in rows)
-
-    lines = [f"# Extraction review{f' - {document}' if document else ''}", ""]
-    lines += [
-        f"- **{len(rows)}** equipment entries",
-        f"- **{filled}** of {leaves} fields carry a value "
-        f"({filled / leaves:.0%} of the agreed schema is populated)"
-        if leaves
-        else "- no fields extracted",
-        f"- job **{result.status.value}**, "
-        f"{result.segments_done}/{result.segments_expected} segments read",
-    ]
+    lines = [f"# Extraction review{f' - {document}' if document else ''}", "",
+             f"Job: **{result.status.value}**. {result.segments_done} completed, {result.segments_review} require review, "
+             f"{result.segments_failed} failed out of {result.segments_expected} segments.", "",
+             f"{len(result.systems)} assembled systems; {len(result.unassigned)} unassigned observations. Counts are not independently verified.",
+             "Schema validity and worker completion do not establish accuracy. Unknown fields remain null in JSON; blank fields are omitted below.", ""]
+    if result.review_required:
+        lines += ["## Review required", "", *[f"- {cell(issue)}" for issue in result.review_required], ""]
+    for label, records in (("System", result.systems), ("Unassigned", result.unassigned)):
+        for index, record in enumerate(records, 1):
+            lines += [f"## {label} {index}: {cell(record.row.get('tag') or 'no equipment identifier')}", "",
+                      f"Motor: {cell(record.motor_tag or 'not extracted')}. Sources: {', '.join(record.sources)}.", "",
+                      "| Field | Reading | Source |", "|---|---|---|"]
+            for path in reading_paths():
+                value = get_field(record.row, path)
+                if path == "tag" or not has_value(value):
+                    continue
+                sources = [f"{item.file_id} p{item.page}: {item.verbatim or ''}"
+                           for key, items in record.evidence.items() if key == path or key.startswith(path + ".")
+                           for item in items]
+                lines.append(f"| {cell(path)} | {cell(display_value(value))} | {cell('; '.join(dict.fromkeys(sources)) or 'verify source')} |")
+            lines += ["", *[f"- {cell(issue)}" for issue in record.issues]]
+            for path, evidence in record.scopes.items():
+                lines.append(f"- Shared {path}: {cell(evidence.verbatim)} ({evidence.file_id} p{evidence.page})")
+            for evidence in record.evidence.get("drawing", []):
+                lines.append(f"- Drawing source: {evidence.file_id} p{evidence.page}: {cell(evidence.verbatim or '')}")
+            lines.append("")
     if result.conflicts:
-        lines.append(f"- **{len(result.conflicts)}** conflicts, listed at the end")
-    lines += ["", "Blank rows are fields the service did not find. They are shown", 
-              "rather than hidden so gaps are visible.", "", "---", ""]
-
-    for row in rows:
-        tag = row.get("tag")
-        lines.append(f"## {tag or '(tag not read)'}")
-        lines.append("")
-        lines.append("| Field | Value |")
-        lines.append("|---|---|")
-        for path, value in _flatten(row):
-            if path == "tag":
-                continue
-            label = LABELS.get(path, path.replace(" / ", " "))
-            shown = "-" if value is None or value == "" else str(value)
-            lines.append(f"| {label} | {shown} |")
-        lines.append("")
-
-    if result.conflicts:
-        lines += ["---", "", "## Conflicts", ""]
-        for c in result.conflicts:
-            origins = ", ".join(o.value for o in c.origins)
-            lines.append(
-                f"- **{c.field}**: {' vs '.join(c.values)} (from {origins})"
-                f"{' - ' + c.resolution if c.resolution else ''}"
-            )
-        lines.append("")
-
-    if result.payload.notes:
-        lines += ["---", "", "## Notes from the extractor", ""]
-        lines += [f"- {n}" for n in result.payload.notes]
-        lines.append("")
-
+        lines += ["## Conflicts", "", "Precedence selects a provisional reading; conflicting readings remain unresolved.", ""]
+        lines.extend(f"- {cell(conflict.field)}: " + " vs ".join(
+            f"{cell(value)} ({origin.value})" for value, origin in zip(conflict.values, conflict.origins)) for conflict in result.conflicts)
+    if result.notes:
+        lines += ["", "## Extraction notes", "", *[f"- {cell(note)}" for note in result.notes]]
     return "\n".join(lines)

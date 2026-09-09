@@ -1,577 +1,217 @@
-# Document processing for mixed engineering specification packages
+# GoSelect Document Processing
 
-Turns a heterogeneous specification package — prose, schedules, drawings, floor
-plans, often scanned — into the customer's agreed extraction schema, with every
-value traceable to a page, a bounding box and a section.
+Extract VFD and motor specifications from a PDF package using native Azure Content Understanding (CU) and the native Azure OpenAI SDK. The baseline uses segment extraction and one assembly pass. An opt-in notebook alternative sends the saved permitted CU content and original drawing regions together in one document-set request, without baseline assembly.
 
-**The design in one line:** the pipeline's unit of work is the *content region*,
-not the *file*. Everything else in the surrounding cloud architecture stays as
-drawn.
+**Current status:** offline checks cover both paths. Source review of the 2026-09-08 baseline found four real systems plus one false system, with shared specifications missing from the real equipment rows. One combined-request experiment returned four real systems with substantially more applicable specifications, but still misplaced minimum ampacity, omitted requirements and produced incomplete evidence. Neither path is approved for quotation use. Valid JSON, field population, completed workers and source confidence do not establish extraction accuracy.
 
-```bash
-pip install --user -e .[dev]
-cp .env.example .env && az login       # then set CONTENTUNDERSTANDING_ENDPOINT
-
-goselect-docproc setup-analyzer        # once: deploys the router + 2 sub-analyzers
-goselect-docproc run sample_docs/98624_1_VFDSchedule.pdf --out out/run
-```
-
-Both commands default to the same analyzer id (`$CU_ANALYZER_ID`, else
-`goselectRouterV3`). To use a different one, pass `--analyzer-id` to *both*.
-
-That writes `out/run/deliverable.json` (the agreed schema, for the quotation
-system) and `out/run/review.md` (the same values as a table a person can check).
-
----
-
-## 1. The problem
-
-A drives supplier receives specification packages from customers and channel
-partners and must turn them into a bid. One opportunity arrives as several PDFs
-mixing narrative specification, tabular schedules and engineering drawings.
-
-Four defects were reported.
-
-| # | Symptom | Actual cause |
-|---|---|---|
-| 1 | A mixed PDF is classified once and routed down one branch | The loop variable is the **file**. A file has one label; its pages do not |
-| 2 | Section references are misattributed, worse on scans | Attribution fell back to *nearest text above in reading order*, wrong on two-column and landscape pages |
-| 3 | Parallel per-type outputs are hard to recombine | No total order over the parts, and no proof nothing was dropped |
-| 4 | Drawing tags come back corrupted: `VFD-401` → `$\sqrt{150-401}$` | `enableFormula` reads the box around a tag as a radical sign |
-
-Plus one policy requirement: **floor plans must be excluded**. A scaled layout
-shows where equipment physically sits; its dimension strings read as plausible
-equipment tags, and it can never say which drive feeds which motor.
-
-### The corpus
-
-Real customer material, six PDFs.
-
-- **`98624_1_VFDSchedule`** — one page, a 42-row VFD schedule under a three-level
-  merged header. The extraction case.
-- **`98850_1_CombinedElectrical`** — ten pages: prose, three schematic sheets,
-  six floor plans. The classification and plan-drop case.
-- **`98878_1` + `98878_2`** (Package A) — a nine-page scanned submittal plus a
-  separate one-line diagram. Neither file alone can produce a quote: the
-  specification names a manufacturer and no equipment; the one-line names four
-  drives and no ratings; the ratings exist only as handwriting on the sheets. The
-  specification says so itself — *"Refer to the single line diagrams on the
-  electrical sheets for the minimum required VFD ampacity ratings."*
-- **`98796_2`, `98813_2`** (Package B) — E-size drawing sets, no prose. The
-  resolution case in §5.
-
----
-
-## 2. What the pipeline does
-
-Six stages, 4,125 lines across 19 modules.
-
-| Stage | Input | Output | Module |
-|---|---|---|---|
-| **Ingest** | PDF bytes | `FileRef` with a frozen ordinal and a SHA-256 | `cli.py` |
-| **Route** | PDF bytes | A category per page or sub-page segment, plus one immutable text string | `producers/content_understanding.py` |
-| **Extract** | One segment | Fields, against the schema for *that* category | `extractors.py` |
-| **Logic** | Raw fields | Units parsed, tags repaired, grounding enforced | `validate.py`, `reconcile.py` |
-| **Assemble** | All segment results | One payload: ordered, deduped, conflicts surfaced | `assemble.py` |
-| **Deliver** | The job result | The agreed schema + a human review sheet | `deliver.py` |
-
-Coverage is proved alongside routing (`manifest.py`): every character is either
-claimed by a segment or declared page furniture, and `unexplained == 0` is
-asserted, not assumed.
-
-**Split the index, not the bytes.** One analyze call per file produces one
-immutable `content` string; every region is an `(offset, length)` range over it.
-Regions are views, never copies, so reassembly is a sort.
-
-### Execution order
-
-```mermaid
-flowchart TB
-    classDef det fill:#e6f2ea,stroke:#2f6b46,color:#10301f,stroke-width:1px
-    classDef svc fill:#ddf4ff,stroke:#0969da,color:#0a2540,stroke-width:1px
-    classDef llm fill:#fdefe0,stroke:#a75c17,color:#3a2008,stroke-width:1px
-    classDef gate fill:#fff6d9,stroke:#8a6d00,color:#332800,stroke-width:1px
-    classDef io fill:#e7edf8,stroke:#33518a,color:#141f36,stroke-width:1px
-    classDef drop fill:#fbe9e7,stroke:#a33227,color:#3d100b,stroke-width:1px
-
-    IN(["PDF package<br/>1..n files"]):::io
-
-    subgraph P1["1 - Route | one analyze call per file"]
-        ROUTER["<b>goselectRouterV3</b><br/>contentCategories + enableSegment<br/>enableFormula = false"]:::svc
-        CAT{"category per page<br/>or sub-page segment"}:::gate
-        SEC["sections.py<br/>heading to char offset,<br/>document boundaries"]:::det
-        COV["manifest.py<br/>coverage proof<br/>unexplained == 0"]:::det
-    end
-
-    subgraph P2["2 - Extract | one sub-analyzer per object type"]
-        FSCH["<b>...V3Schedule</b><br/>22 fields<br/>one row per drive"]:::svc
-        FTXT["<b>...V3Text</b><br/>18 fields<br/>requirements, no tag"]:::svc
-        REND["render.py + tiling.py<br/>rasterise at 100 dpi,<br/>native-resolution tiles"]:::det
-        VIS["models.py<br/>vision model,<br/>strict json_schema"]:::llm
-        DROP(["dropped by policy:<br/>segmented and coverage-proved,<br/>never sent to a model"]):::drop
-    end
-
-    subgraph P3["3 - Logic | deterministic, no model"]
-        EXP["expand_schedule / expand_text<br/>to contract rows"]:::det
-        UNIT["validate.py<br/>units, ranges, grounding"]:::det
-        LEX["reconcile.py<br/>tag lexicon repair"]:::det
-    end
-
-    subgraph P4["4 - Assemble and deliver"]
-        MRG["assemble.py<br/>total order, dedupe,<br/>precedence, conflicts"]:::det
-        DEL["deliver.py<br/>merge rows by tag"]:::det
-    end
-
-    OUT1(["deliverable.json<br/>the agreed schema"]):::io
-    OUT2(["review.md<br/>what a person checks"]):::io
-
-    IN --> ROUTER --> CAT
-    CAT -->|schedule| FSCH
-    CAT -->|text| FTXT
-    CAT -->|drawing| REND --> VIS
-    CAT -->|plan| DROP
-    CAT -->|other| DROP
-
-    ROUTER --> SEC --> COV
-    FSCH --> EXP
-    FTXT --> EXP
-    VIS --> EXP
-    EXP --> UNIT --> LEX --> MRG
-    COV --> MRG
-    SEC --> MRG
-    MRG --> DEL --> OUT1
-    DEL --> OUT2
-```
-
-Phase 1 is one service call per file. Phase 2 is the only place a model runs, and
-for prose and schedules the service runs it inside the same call. Phases 3 and 4
-are arithmetic.
-
----
-
-## 3. Fix per problem
-
-### Problem 1 — multi-type PDFs
-
-`contentCategories` with `enableSegment`: five categories defined by description
-alone, **no training data**. Live on the ten-page combined package:
-
-```
-f1-seg-001  p1-1   TEXT     conf=0.98  regions=['DRAWING','SCHEDULE','TEXT']
-f1-seg-002  p2-2   DRAWING  conf=0.99  regions=['DRAWING','SCHEDULE','TEXT']
-f1-seg-003  p3-3   DRAWING  conf=0.99  regions=['DRAWING','SCHEDULE','TEXT']
-f1-seg-004  p4-4   DRAWING  conf=0.99  regions=['DRAWING','SCHEDULE','TEXT']
-f1-seg-005  p5-10  PLAN     conf=0.99  regions=['DRAWING','TEXT']
-
-coverage: accounted 100.00% (claimed 53843, furniture 1456, unexplained 0) [ok]
-```
-
-One file, five segments, six plan pages excluded — and the `regions` column shows
-the intra-page split, so a schedule printed beside a drawing is separated from it.
-
-**`drawing` vs `plan` is the load-bearing distinction.** Both are bordered sheets
-with a title block, so it cannot be done geometrically:
-
-- **drawing** — symbols joined by lines, shows connectivity, not to scale:
-  one-line, single-line, network, control and ladder diagrams.
-- **plan** — a scaled view of physical space with dimensions: site and building
-  plans, layouts, routing, sections, elevations.
-
-**PLAN is dropped at object granularity, never by page or file.** Implemented as
-`DropExtractor`, which records *why* in the result. Dropping by simply omitting an
-extractor was rejected: it leaves no trace and is indistinguishable from a routing
-bug. Plan segments are still segmented and coverage-proved, so `unexplained` stays
-0 and the completion count still balances.
-
-`Pipeline._warn_on_collateral_drops` logs when a dropped segment also holds prose
-or a grid — the whole-page case a page-level classifier forces.
-
-### Problem 2 — traceability
-
-**Grounding from the service.** `estimateFieldSourceAndConfidence` returns a page,
-a bounding polygon and a 0–1 confidence per field. `parse_source()` turns
-`D(page,x1,y1,…)` into page + polygon.
-
-**Section breadcrumbs, which no service provides.** Grounding says *where on the
-page*; a reviewer needs *which clause*. `sections.py` walks the service's own
-`sections` tree by **span-ordered anchoring**: index every heading by its span
-offset, then attribute any element to the last heading whose offset precedes it.
-Binary search, exact, no model call.
-
-The tree's root children are *separate documents stapled into one file*. On
-Package A the specification occupies offsets 0–18,684 and the drawing sheets
-18,708–21,911; attribution never crosses that line.
-
-Two rules on top, because the tree is imperfect:
-
-- **A sheet never inherits a prose clause.** `SELF_TITLING = {DRAWING, PLAN}` — a
-  sheet carries its own title block and is not a clause of whatever precedes it.
-- **No hierarchy means no headings.** A bare root emits nothing. Falling back to
-  paragraph-role scanning produced **255 "headings"** on a one-line diagram — every
-  equipment label on the schematic.
-
-### Problem 3 — reconstructing parallel work
-
-- **A total order:** `(file_ordinal, span_offset)`. The ordinal is frozen at job
-  creation. Never sort by page — once a page holds several regions it is not a
-  total order.
-- **Idempotency:** the result id is `{jobId}:{fileId}:{segmentId}`, so
-  at-least-once redelivery is an upsert.
-- **Completion without polling:** count *distinct* terminal results and reconcile
-  when `distinct(DONE) + distinct(FAILED) == expected_units`.
-- **A coverage proof:** `claimed + furniture + unexplained == total`, and
-  `unexplained == 0`.
-
-**Merge precedence is customer policy, not engineering, and needs sign-off:**
-
-| Value kind | Precedence | Reason |
-|---|---|---|
-| Numeric specifications | SCHEDULE > TEXT > DRAWING | The grid is authoritative |
-| Pairing / topology | DRAWING > SCHEDULE > TEXT | The diagram shows the wiring |
-
-Disagreement becomes a `Conflict` carried in the result, never silently resolved.
-Segments marked `REVIEW` still contribute their payload — a reviewer needs
-candidates to check, not a blank page.
-
-### Problem 4 — corrupted tags
-
-`enableFormula` is declared **false** on the router. The service default is true,
-and on a drawing the box around a tag reads as a radical sign. This is the
-`$\sqrt{150-401}$` defect, fixed by one flag.
-
----
-
-## 4. One sub-analyzer per object type
-
-This is the part that took two attempts, and the failure is instructive.
-
-The customer's contract (`sample_docs/vfd_motor_schema_v1_0.json`) is **112 fields
-across 6 levels**. `field_schema.py` converts it into a Content Understanding
-`ContentFieldSchema`, and the service accepts it — status READY, zero warnings.
-
-**It accepts the schema and then cannot fill it.** Asking for the whole contract
-per row truncates the document:
-
-| Schema | Rows returned | Contract populated |
-|---|---|---|
-| 112 fields, whole contract | **17 of 42** | 10%, `motor.*` and every `electrical.*` block empty |
-| 22 fields, schedule-shaped | **42 of 42** | 31% |
-
-We were asking for 112 × 42 = 4,704 values from a table with 18 columns. The model
-fills the shallow fields of each row, then stops.
-
-Three hypotheses were tested and eliminated before landing on size:
-
-| Hypothesis | Test | Result |
-|---|---|---|
-| Descriptions too generic | Flat schema, contract's own wording | 42/42 — not the cause |
-| Nesting too deep | Same value requested at depths 3, 4, 5, 6 at once | `45, 45, 45, 45` — not the cause |
-| Category routing interfering | Full contract, routing bypassed | Still fails — not the cause |
-
-So each category gets its own analyzer, sized to what that object can carry:
-
-```
-goselectRouterV3                    classify per page, drop PLAN
-  ├─ schedule → …V3Schedule         22 fields, one row per drive
-  ├─ text     → …V3Text             18 fields, requirements, no tag
-  ├─ drawing  → local render + vision tiles
-  └─ plan     → dropped
-```
-
-The 112-field contract is then assembled **in Python**, from a template derived
-from the customer's own schema so the delivered shape cannot drift.
-
-Measured on the 42-row schedule:
-
-```
-rows with tag           42/42        rows with voltage       42/42
-rows with motor power   41/42        rows with enclosure     42/42
-rows with power unit    41/42        rows with manufacturer  42/42
-```
-
-31% is the honest ceiling for *this* document: a VFD schedule has 18 columns and
-the contract has 112 fields. It cannot state a motor's service factor because that
-is not on the page. What matters is that everything the document does carry
-arrives.
-
-**Units come from the column header, not the cell.** The cell holds `45`; `HP`
-lives in the merged header. A power value without a unit is a quoting hazard, so
-the schedule schema asks for the unit separately.
-
-**Prose rows are deliberately tagless.** A specification states what any drive
-must satisfy and names no equipment, so `expand_text` can never emit a `Pair`.
-Assembly merges the requirement row into the tagged rows a schedule supplies.
-
-### Why Content Understanding, and what it does not do
-
-The Document Intelligence path was deleted after a bench-off. The decisive fact
-was a capability gap, not a quality gap: a heuristic classifier **cannot emit
-`PLAN`**, because a scaled layout and a one-line are both sparse bordered sheets.
-It could never implement the plan-drop policy. Removing it took out 1,289 lines.
-
-**But the service cannot read engineering drawings.** `enableFigureAnalysis`
-supports `Bar`, `Line`, `Pie`, `Radar`, `Scatter`, `Bubble`, `Quadrant`, `Mixed`,
-`Flow chart`, `Sequence` and `Gantt` — all business charts. A one-line diagram is
-none of them, and the service returns figure *descriptions* with **no image bytes
-and no retrieval endpoint**. So `render.py`, `tiling.py` and `models.py` stay:
-the drawing image is produced locally and read at native resolution.
-
-| Gap no vendor fills | Why |
-|---|---|
-| Section breadcrumbs | Grounding answers *where on the page*, not *which clause* |
-| Native-resolution CAD reading | Every vision path downscales to a token budget |
-| Cross-region precedence | "A schedule outranks a drawing for a kW rating" is customer policy |
-
----
-
-## 5. Drawings: the bottleneck is pixels, not the model
-
-On Package B the service returned `VD-401` paired with `RWP-A01`. The truth is
-`VFD-401` feeding `RWP-401` — a dropped glyph and a `4→A` substitution, both
-signatures of text below legibility.
-
-Walking the resolution ladder on sheet 1, with the package-wide tag lexicon:
-
-```
-source                        tiles  vis-tokens   VFD-401 / RWP-401
-service figure crop 1477x934    —        —        VD-401 / RWP-A01   WRONG
-rendered  100 dpi 3600x2400    24      ~18k       VFD-401 / RWP-401  correct
-rendered  150 dpi 5400x3600    48      ~37k       VFD-401 / RWP-401  correct
-```
-
-**100 dpi is the default**: same tags as 150, half the tokens, and it fits under
-the 40-tile cost guard where 150 does not.
-
-Model choice differs by branch, and the evidence points opposite ways:
-
-```
-TEXT (Package A specification, against a hand-typed key)
-  gpt-5.4-mini    9/10 values,  9/10 clauses,  3.3s    <- good enough
-  gpt-5.6-sol    10/10 values, 10/10 clauses,  7.0s
-
-DRAWING (Package B sheet 1)
-  gpt-5.4-mini    whole image   8 tags   0/4 drives    <- all fabricated
-  gpt-5.6-sol     tiled        10 tags   4/4 drives
-```
-
-The mini invented a plausible tag scheme that appears nowhere on the drawing.
-
-### Service limits that shape the design
-
-- **Images per request: 50.** A four-sheet segment at 100 dpi produces 51 tiles
-  and fails with `HTTP 400`. Tiles are batched and merged.
-- **Tile cap raises, never truncates.** Exceeding `max_tiles` throws, so a cost
-  overrun is visible rather than becoming quiet content loss.
-- **Vision downscaling.** `detail="high"` fits into 2048×2048, then scales again
-  so the *shortest* side is 768 px. On an E-size sheet 10 pt glyphs arrive ~3 px
-  tall.
-- **Async limits:** 200 MB / 300 pages; results auto-deleted after 24 h.
-- **No result caching.** Document Intelligence cached by SHA-256; Content
-  Understanding does not, so every run bills again.
-
----
-
-## 6. What is proven, and what is not
-
-**Proven on real customer data:** per-page classification at 0.98–0.99 confidence
-including plan/drawing separation, 100% coverage on every document, plan drop at
-object granularity, section breadcrumbs on a scanned document, intra-page
-separation, drive-schedule extraction at 42/42 rows, and tag-level accuracy on an
-E-size drawing package once rendered at 100 dpi.
-
-**Not proven:**
-
-1. **Pair precision.** Both engines emitted soft-starter tags as though they were
-   drives. Quoting six drives instead of four is exactly the commercial error this
-   exists to prevent.
-2. **Schedule pairs are one-sided.** The contract keys a pair on a single `tag`
-   and gives the motor no identifier, so `pair_f1` cannot be scored. See §7.
-3. **Classifier determinism.** Category assignment was stable across runs, but the
-   *grouping* of consecutive same-category pages was not, and one document
-   returned 16 rows on one run and 42 on the next. Harmless while plans are
-   dropped either way; not harmless for a category that gets extracted.
-4. **Confidence is inverted.** On the schedule, fields **with** a value scored
-   0.219–0.864; fields **with no** value scored 0.920–0.972. The service is most
-   confident when it concludes a field is absent. Any review threshold must be
-   calibrated on populated fields only — `PipelineConfig.field_review_threshold`
-   is a placeholder, not a validated number.
-5. **The eval labels are stale.** `eval/labels/*.json` predate the five-category
-   taxonomy, contain only `TEXT` and `DRAWING`, and cover 2 of 6 documents. They
-   cannot score plan suppression or schedule routing.
-
-**Every number here comes from six documents.**
-
-### The evidence loop
-
-`eval/score.py` asserts gates and exits non-zero, so it belongs in CI. **It never
-runs in production** — labels are exam papers, not pipeline inputs.
+## Baseline Pipeline
 
 ```mermaid
 flowchart LR
-    classDef off fill:#e7edf8,stroke:#33518a,color:#141f36,stroke-width:1px
-    classDef human fill:#f3e9f7,stroke:#6b3b86,color:#2b1636,stroke-width:1px
-    classDef gate fill:#fff6d9,stroke:#8a6d00,color:#332800,stroke-width:1px
-    classDef good fill:#e6f2ea,stroke:#2f6b46,color:#10301f,stroke-width:1px
-
-    subgraph PROD["Production | every upload | no label exists"]
-        NEW["package"]:::off --> PIPE["the pipeline"]:::off
-        PIPE --> DELIV["deliverable.json<br/>+ review.md"]:::off
-        DELIV --> CONF{"confident and<br/>grounded?"}:::gate
-        CONF -->|yes| THRU(["straight through"]):::good
-        CONF -->|no| REVQ["human review queue"]:::human
-    end
-
-    subgraph OFF["Offline | runs in CI"]
-        LABELS["eval/labels"]:::human --> SCORE["score.py<br/>page F1, boundary IoU,<br/>headings, coverage, pairs"]:::off
-        SCORE --> VERD{"every gate met?"}:::gate
-    end
-
-    REVQ -.->|a correction is a label| LABELS
+    PDF[Ordered PDFs] --> CU[Native CU sub-page classification]
+    CU --> TS[TEXT and SCHEDULE: shared CU field analyzer]
+    CU --> D[DRAWING: masked PDF regions and image tiles]
+    CU --> P[PLAN: explicit exclusion]
+    CU --> O[OTHER: review]
+    D --> M[Native OpenAI structured output]
+    TS --> A[One schema-derived adapter]
+    M --> A
+    A --> V[Customer shape and evidence checks]
+    V --> J[One assembly: systems and unassigned observations]
+    J --> JSON[Validated customer JSON]
+    J --> R[Compact source review]
 ```
 
-**The review queue produces labels for free.** When a reviewer corrects an
-extraction, that correction is a label. The orchestration design already stores
-user corrections in the job record — that field *is* the label pipeline.
+- The unit of work is a native segment, not a whole file or page. A PDF and a page can contain multiple categories. Plans do not exclude their sibling schedule, text or schematic regions.
+- TEXT and SCHEDULE use the same CU field schema. Missing or incompatible routed fields fail visibly; there is no reduced text fallback.
+- DRAWING uses original-PDF rendering, native polygon masking and overlapping tiles. The model receives the same complete extraction schema. A tile-limit failure never silently discards part of a drawing. Model readings always require review.
+- OTHER remains visible for review. PLAN produces an explicit exclusion note and no drawing-model request.
+- Native segment identifiers and categories associate field results with their owner. Ambiguous ownership and duplicate field results fail instead of silently selecting or overwriting a segment.
+- The SDKs handle transport retries. There is no custom REST transport, fuzzy tag repair, PDF-specific extraction rule or expected-tag list in production.
 
----
+## Alternative Pipeline
 
-## 7. Decisions the customer must make
+The optional notebook branch uses [src/goselect_docproc/document_set.py](src/goselect_docproc/document_set.py). After steps 1-8, it uses the current run's `RUN_DIR` and `deliverable` automatically. No run paths or additional environment variables are needed. It reuses CU content without another CU request and leaves the baseline and deployed analyzers unchanged. The baseline CU run still performs its configured routed field extraction; the alternative ignores those field values, not their already-incurred cost.
 
-1. **A motor tag in the contract.** Ground truth pairs a drive with a motor
-   (`VFD-H1` ↔ `HIGH SERVICE PUMP 1`), but the schema has one `tag` per pair and
-   no motor identifier. Pairs are therefore one-sided and pair accuracy cannot be
-   scored. Add `motor_tag`, or rename `tag` → `vfd_tag` and add one.
-2. **Merge precedence** — does a schedule or a drawing win a disagreement about a
-   motor rating?
-3. **Review threshold** — what does a wrong rating cost in a quote, versus a
-   person's time to check it? See the inverted-confidence finding above.
-4. **Failure posture** — fail closed, return partial data flagged, or hold for
-   review? The default here is *partial, flagged, held*.
-5. **Residency and language scope.**
-6. **Corpus access** — 15–20 real packages, labelled with the five-category
-   taxonomy. The critical-path dependency; no code substitutes for it.
+```mermaid
+flowchart TD
+    PDF[Ordered original PDFs] --> CU[Native CU analysis and sub-page classification]
+    CU --> BASELINE[Steps 1-8: baseline extraction, assembly and export]
+    BASELINE --> CACHE[Current RUN_DIR: configuration, manifest and raw CU responses]
+    CACHE --> TEXT[Permitted TEXT, SCHEDULE and DRAWING text spans]
+    CACHE --> BOUNDS[Native DRAWING polygons and page angles]
+    CACHE --> EXCLUDE[PLAN excluded; OTHER listed for review]
+    PDF --> MASK[Render and mask permitted drawing regions]
+    BOUNDS --> MASK
+    MASK --> IMAGES[Upright overviews and overlapping detail tiles]
+    TEXT --> CHECK[Local hashes, coverage and size guards]
+    IMAGES --> CHECK
+    CHECK --> GATE{Explicitly enable paid request?}
+    GATE -->|Yes| MODEL[One native Azure OpenAI request - full customer schema]
+    GATE -->|No| STOP[No request; baseline unchanged]
+    MODEL --> RAW[Save inputs, raw response and usage]
+    RAW --> VALIDATE[Reject refusal, truncation or invalid customer shape]
+    VALIDATE --> RESULT[Separate customer JSON, evidence and review issues]
+    RESULT --> COMPARE[Side-by-side baseline and alternative fields]
+    BASELINE -->|Current deliverable| COMPARE
+    PDF --> REVIEW[Original page beside permitted CU text]
+    TEXT --> REVIEW
+    COMPARE --> HUMAN[Source review - no automatic acceptance]
+    REVIEW --> HUMAN
+```
 
----
+- Related documents are interpreted together. The model assigns common and component-specific requirements directly to customer rows; this branch bypasses baseline field mapping and assembly. It never receives the baseline answers or an expected-tag list as model input.
+- The full customer schema is unchanged. Model-produced evidence, unresolved requirements and review issues remain outside customer JSON. These references are not native CU per-field grounding and need verification.
+- Original PDFs must remain available and match the saved hashes. Only permitted drawing polygons are submitted; overviews preserve context and tiles preserve detail. Full-page previews are local review only, never extra model input.
+- Preparation and comparison are local. A new request is disabled by default, uses one SDK attempt with retries disabled, and saves a unique directory under the current run's `alternatives/`. Baseline and previous alternative outputs are not overwritten.
+- Guards stop above 50 total images, 40 detail tiles per region or 120,000 permitted source characters. No content is silently dropped. These are conservative application guards, not a model-specific token guarantee. Output is capped at 24,000 tokens; truncation prevents customer export. Text-only sets are supported.
 
-## 8. Running it
+### Source-Reviewed Comparison
 
-The devcontainer resolves packages through the Microsoft CFS proxy
-(`packagefeedproxy.microsoft.io`); the public PyPI wheel CDN is not routable.
-`PIP_INDEX_URL` is set in `.devcontainer/devcontainer.json`, so pip needs no flags.
+One request on 2026-09-08 used the Howey specification and single-line PDFs, 25,344 permitted CU text characters and three original drawing regions represented by 42 images at 300 DPI. The existing drawing deployment was `gpt-5.6-sol`. It completed in 114 seconds with 37,057 input and 13,607 output tokens (50,664 total). No new CU analysis was needed. Monetary cost was not calculated without verified deployment pricing.
+
+The table compares the four real customer equipment rows, not unassigned observations. It is a selected source-based comparison, not an overall accuracy score.
+
+| Item | Baseline | Combined request |
+|---|---|---|
+| Equipment inventory | Four real systems plus one false system | Four real systems only |
+| ABB / ACQ580 | Absent from all four rows; captured unassigned | Present on all four |
+| Three-phase, 60 Hz input; passive filters; Ethernet/IP | Absent from all four rows | Present on all four |
+| Minimum 65,000 AIC | Missing | Included on all four |
+| Five-year drive warranty | Missing | Included, with coverage details shortened |
+| Filter UL/cUL under UL 508A | Misclassified as VFD certification | Retained in filter details |
+| Minimum VFD ampacity | Safely qualified in notes | Incorrectly put into input-current numeric fields |
+| TCI filter manufacturer / three-year filter warranty | Missing | Still absent from customer rows; warranty only in review commentary |
+| Motor-symbol numbers | Omitted | Retained without inventing HP units |
+
+Additional limits: the alternative still omitted frequency-stability details, bundled 460 V specification and 480 V drawing readings into one value, and supplied incomplete/bundled evidence for some fields. Its 112 evidence entries are not 112 verified facts. The frozen trial instructions are retained; this notebook integration does not claim to fix those extraction defects.
+
+This is not a controlled context-only A/B test: prose extraction also moved from CU's `gpt-5.4-mini` to the drawing deployment, and prompt, schema presentation, orientation, overviews and output budget differed. No repeatability or held-out document-set evaluation has established general accuracy. Test the same approach on another document set before promoting it.
+
+## Customer Contract
+
+[sample_docs/vfd_motor_schema_v1_0.json](sample_docs/vfd_motor_schema_v1_0.json) is the only customer field definition. [src/goselect_docproc/field_schema.py](src/goselect_docproc/field_schema.py) derives flat dotted paths for every scalar or array leaf. Parent descriptions stay attached to the leaf descriptions. The adapter reconstructs the original nesting without a handwritten mapping table.
+
+All fields are requested, including motor and electrical fields. Unknowns remain null or empty arrays; requesting every field does not guarantee that the service extracts every value. CU's single-type field definitions represent mixed number/string customer values as strings, which the customer schema permits. Units and qualified readings are not inferred or converted locally.
+
+CU rejects dots in field names. At that service boundary only, dotted paths use double underscores, for example `motor__electrical__voltage__value`. The schema-derived lookup restores customer and evidence paths; collisions fail before deployment. Customer JSON and drawing-model paths are unchanged.
+
+Extraction metadata stays outside customer JSON: explicit motor identifier, identified-system flag, evidence, applicability quotes and review issues. The customer schema has no separate motor-tag property. `GOSELECT_CONTRACT` can select another contract with the same `json_schema.properties.vfd_motor_pairs.items` envelope.
+
+## Assembly And Review
+
+[src/goselect_docproc/assemble.py](src/goselect_docproc/assemble.py) runs once. Customer JSON and the report read its stored systems directly; neither merges again.
+
+- Identified schedule entries and connected schematic systems become candidate systems. Generic/template labels, tagless requirements and other observations remain unassigned rather than becoming equipment rows.
+- Matching ignores identifier case and surrounding whitespace only. Repeated rows within a schedule and different motor endpoints stay separate. Ambiguous identities require review.
+- `SCHEDULE > TEXT > DRAWING` selects provisional readings. Value, unit and qualifier stay together. Conflicting readings remain in the job and report; precedence does not resolve their correctness.
+- Only field-specific, explicitly all-project-VFD clauses with native source evidence and a quote present in the text segment can be shared. The source and target must qualify for automatic assembly. Motor fields and equipment quantity never inherit this scope. Unassigned portions remain visible.
+- No upstream switchboard/breaker rating is intentionally mapped to a motor or drive rating. Minimum ampacity belongs in qualified notes, not motor FLA. The combined-request trial shows that prompt instructions alone do not guarantee correct field semantics.
+
+`DONE` means the configured mechanical gates passed, not that an engineer approved the result. Missing fields, incorrect readings or connections may escape automated checks. Native confidence is uncalibrated; no field confidence threshold is enabled by default.
+
+## Setup
+
+Use Python 3.11 or newer from the repository root. Install the project in the interpreter selected for the notebook and editor:
 
 ```bash
-# The devcontainer does this on create; this is the manual equivalent.
-# No venv: the workspace is a bind mount, and --user installs to the
-# container's own filesystem instead of across it.
-pip install --user -e .[dev]
-
-cp .env.example .env      # fill in CONTENTUNDERSTANDING_ENDPOINT
-az login                  # DefaultAzureCredential
-
-pytest -q                 # 142 tests, no cloud calls, no spend
+python -m pip install -e '.[dev]'
+python -m pytest -q
 ```
 
-| Command | Cost | Purpose |
-|---|---|---|
-| `setup-analyzer` | none | Deploy the two field analyzers, then the router. Run once per schema change |
-| `segment <pdf>...` | one analyze call per file | Categories, regions and the coverage proof |
-| `plan <pdf>...` | one analyze call per file | The exact queue messages that would be sent |
-| `run <pdf>... [--model <deployment>]` | analyze + model | Full pipeline → `deliverable.json`, `review.md` |
-| `tiles <width> <height>` | none | Vision budget before spending a token |
-| `python eval/report.py <pdf>...` | analyze + model | Self-contained HTML report |
-| `python eval/score.py` | none | The scorecard, exits non-zero on a failed gate |
-| `python eval/inpage_bench.py` | analyze calls | Page-level vs in-page segmentation |
+[requirements.txt](requirements.txt) is the single runtime dependency list. The CU SDK is pinned to `1.2.0b3` for API `2026-06-01-preview` and native `allow_in_page_segments`. This is a preview feature; validate service suitability and operational requirements before production use.
 
-Every command that reaches the service takes `--analyzer-id`, defaulting to
-`$CU_ANALYZER_ID` and then to `goselectRouterV3`. The two field analyzers are
-derived from it (`<id>Schedule`, `<id>Text`), so `setup-analyzer` and `run` stay
-in step as long as both see the same id. If the analyzer does not exist the CLI
-says so and names the setup command, rather than raising `ModelNotFound`.
+Configure the environment using [.env.example](.env.example):
 
-### Where results go
+| Setting | Purpose |
+|---|---|
+| `CONTENTUNDERSTANDING_ENDPOINT` | CU resource endpoint |
+| `CONTENTUNDERSTANDING_API_KEY` | Optional key; otherwise `DefaultAzureCredential` |
+| `CU_ANALYZER_ID` | Router analyzer ID |
+| `REPORT_MODEL` | Intended deployment for CU completion |
+| `REPORT_DRAWING_MODEL` | Separate direct drawing-model deployment |
+| `AZURE_OPENAI_ENDPOINT` | Optional drawing endpoint; defaults to CU endpoint |
+| `AZURE_OPENAI_API_KEY` | Optional drawing key; otherwise Azure Identity |
+| `DRAWING_DPI` | Notebook render resolution, default 300 |
+| `GOSELECT_PDFS` | Optional notebook JSON array of ordered PDF paths |
+| `GOSELECT_CONTRACT` | Optional customer-contract path |
 
-```
-out/
-  analyzers/                       what is deployed on the Azure resource
-    goselectRouterV3.json            the router: categories and routing table
-    goselectRouterV3Schedule.json    the 22-field schedule schema
-    goselectRouterV3Text.json        the 18-field prose schema
+The configured models must exist and be supported on the resource. CU uses a logical model identifier mapped to a deployment in resource defaults; the direct drawing client uses a deployment name. The application does not modify resource-wide model mappings.
 
-  runs/<package>/                  one folder per document package
-    deliverable.json                 the agreed GoSelect schema  <- the output
-    review.md                        the same values, for a human to check
-    manifest.json                    segments, sections, coverage proof
-    results.json                     one record per segment
-    job.json                         status, conflicts, what needs review
+### Explicit Analyzer Deployment
+
+This command replaces two analyzer definitions: `<router>Fields` and `<router>`. Text and schedules both route to the shared field analyzer. Plans and drawings do not route to CU field extraction.
+
+```bash
+goselect-docproc setup-analyzer --analyzer-id goselectRouterV3 --completion-model <logical-cu-model>
 ```
 
-`<package>` is the shared stem of the input filenames, so two runs on different
-documents cannot overwrite each other. Override with `--out <dir>`.
+Run this only with permission to replace those resources. Setup checks the model mapping first. Old per-category compact analyzers are incompatible with the new contract and are not automatically deleted. The read-only preflight stops before paid analysis when deployed routing or fields are stale. After the offline simplification, an explicitly approved deployment created `goselectRouterV3Fields` and updated `goselectRouterV3`; no document analysis or drawing inference was invoked.
 
-**`analyzers/` is configuration, `runs/` is output.** The first records what was
-deployed to Azure and changes only when you run `setup-analyzer`; the second is
-produced by every `run`. Everything under `out/` is regenerable and safe to
-delete.
+## Customer Demonstration
 
----
+Open [run_goselect_docproc.ipynb](run_goselect_docproc.ipynb) and run top to bottom. After changing analyzer definitions or field descriptions, set `UPDATE_ANALYZERS = True` in Settings, restart the kernel, then Run All. Setup updates the shared field analyzer and router before preflight; no separate function call or jumping between cells is needed. Leave the switch false when no analyzer update is required, and return it to false after updating. Changes only to direct OpenAI prompts do not require analyzer deployment.
 
-## 9. Integration
+1. **Inputs and schema:** ordered PDFs, settings and full requested-field coverage.
+2. **Clients:** native SDK construction, followed by analyzer setup only when `UPDATE_ANALYZERS` is true.
+3. **Preflight and analysis:** check deployed fields, routing and evidence settings, then analyze uncached PDFs.
+4. **Source inspection:** all segments, native regions, fields, warnings and drawing/plan previews. Confirm exclusions visually.
+5. **Extraction:** native fields or drawing tiles, with worker status.
+6. **Field validation:** inspect populated readings, evidence, uncertainty and errors.
+7. **Assembly:** systems, unassigned observations and conflicts from one merge.
+8. **Export:** preserve diagnostics, validate customer JSON, and show the compact review.
 
-**One new state, one changed loop variable, one new state at the tail.** Object
-storage, the message bus, container jobs, the document store, the model gateway,
-API management, identity, secrets, correlation ids and CI/CD all stay as drawn.
+`UPDATE_ANALYZERS` defaults to false. Enabling it authorizes replacement of the two configured analyzers on every run, without changing resource-wide model mappings. Run All does not install packages, but it does perform paid extraction and runs the alternative if `RUN_ALTERNATIVE` is true. Saved notebook outputs are historical and explicitly labelled as such. They are not evidence for the current implementation. Offline tests execute the notebook top to bottom with analyzer updates both disabled and enabled, synthetic PDFs and native SDK response models, including a retained drawing record under REVIEW.
 
+Step 3 contacts Azure for configuration and makes one paid CU analysis per uncached PDF. Its cache namespace includes endpoint, API/SDK versions, analyzer definitions, extraction schema and resource model mappings. Cached usage belongs to the original request. Step 5 makes new paid drawing requests whenever executed. Drawing DPI does not invalidate CU analysis.
+
+### Alternative Demonstration
+
+After completing steps 1-8, continue in the **same kernel**. Do not rerun the baseline or configure any paths.
+
+1. **Prepare, step 9 (cell 21):** run the cell. It uses this run's CU content automatically. Inspect the counts and masked drawing previews. No Azure request is made.
+2. **Send, step 10 (cell 23):** set `RUN_ALTERNATIVE = True` and run the cell. It makes one paid Azure OpenAI request using the existing drawing model and connection settings. CU is not called again. The alternative is saved automatically; the baseline is unchanged.
+3. **Compare, step 11 (cell 25):** run the cell to see this run's baseline and alternative side by side, with evidence and a PDF/CU-text view. Optionally change `SOURCE_TO_REVIEW` to inspect another source.
+
+The switch defaults to false. Every execution with it edited to true is billable; executing with false makes no request and preserves the current alternative result for comparison. Duplicate or missing tags are not auto-matched, and comparison does not change values or saved artifacts.
+
+Alternative artifacts are saved under `RUN_DIR / "alternatives" / <unique-id>`: input manifest, submitted images, prompt, schema, request settings, raw response, usage, result and separate customer JSON. Failure leaves available diagnostics and no successful customer export. This alternative is notebook-only; CLI behavior is unchanged.
+
+## CLI And Artifacts
+
+```bash
+goselect-docproc segment <pdf>... --strict
+goselect-docproc plan <pdf>...
+goselect-docproc run <pdf>... --drawing-model <deployment>
 ```
-Initialise
-  └─ Segmentation                          <-- NEW
-       └─ Extraction_Orchestration
-            ├─ for each TEXT segment      -> routed sub-analyzer
-            ├─ for each SCHEDULE segment  -> routed sub-analyzer
-            ├─ for each DRAWING segment   -> vision, native-res tiles
-            └─ for each PLAN segment      -> dropped, with a reason
-       └─ JSON_Validation
-       └─ CrossSegment_Reconciliation      <-- NEW
-       └─ Save_Results
-```
 
-`pipeline.py` maps 1:1 onto those states, so the logic can be adopted without
-adopting the runtime. Concurrency here is a thread pool; in production it is queue
-depth, and nothing in the logic depends on which.
+All three commands perform preflight and paid CU analysis; the CLI does not enable the notebook cache. `run` also invokes the drawing model when needed. Missing drawing configuration fails drawing segments visibly. REVIEW and FAILED jobs return a nonzero exit code. Default output directories are unique under `out/runs`; `--out` explicitly chooses a reusable directory.
 
-**Storage — write once, never mutate.** The document store holds job state and one
-document per segment result, partitioned on `/job_id`. Nothing large goes in the
-document store; nothing mutable goes in object storage.
+| Artifact | Contents |
+|---|---|
+| `manifest.json` | Files, native segments, section context, returned-markdown accounting |
+| `results.json` | Original observations, evidence and worker issues |
+| `job.json` | Assembled systems, unassigned observations, conflicts and status |
+| `deliverable.json` | Schema-validated customer rows for assembled systems only |
+| `review.md` | The same populated readings with units, sources and review issues |
 
-**The queue message is a pointer, never a payload** — job and correlation ids, file
-and segment ids, page range, spans, section root, analysis URI, figure ids and the
-per-segment feature flags. The worker fetches the slice it needs.
+The notebook additionally writes configuration, raw CU responses and original usage. Diagnostic artifacts are retained even when customer JSON validation fails. Internal job/worker contracts are version `2.0.0`; older domain-model jobs must be rerun, not interpreted as current results. The customer schema is unchanged.
 
-**Per-segment feature flags.** High-resolution OCR on prose pages is money burned:
+## Validation Limits
 
-| Segment | `highResolution` | `formula` |
-|---|---|---|
-| TEXT | off | off |
-| SCHEDULE | off | off |
-| DRAWING | **on** | **off** |
+Offline regressions cover schema completeness and round trips, native field mapping, evidence gates, scope restrictions, conflicts, distinct repeated rows, mixed-content routing, region rendering, model refusal/truncation and the complete notebook workflow. They are generic behavior checks, not a customer-PDF answer key.
 
-**Alert on three things**, all silent failures otherwise: `unexplained_chars > 0`,
-the share of segments routed to review, and tiles per drawing above the guard.
+The approved native full-nested-schema probe returned schedule rows but left electrical blocks empty. Increasing the row count was not an extraction-quality success. The subsequent flat-schema run and single combined-request trial received source review as described above; both have unresolved accuracy problems. No additional paid calls were made while implementing the notebook alternative.
 
-**Durable restart.** `poller.continuation_token()` plus
-`begin_analyze(continuation_token=…)` resumes an analyze call across a container
-restart, which is what makes this safe in a job runtime.
+Returned-markdown coverage proves only that returned characters were assigned or classified as furniture. It does not establish OCR recall, source page completeness, classification correctness, field recall or connectivity accuracy. Source evidence enables inspection; it does not make a reading correct.
 
----
+[eval/score.py](eval/score.py) remains an offline scorer for explicitly supplied labels and current jobs. Its existing labels are evaluation-only and never production inputs. It does not measure full field accuracy, and its page-level classification metric is not a sub-page quality metric. Unmeasured gates do not pass. [eval/inpage_bench.py](eval/inpage_bench.py) is an optional **paid** boundary comparison that replaces its benchmark analyzers; it does not validate extraction accuracy.
 
-## 10. Phasing
+Before customer acceptance, obtain approval for deployment and a bounded live evaluation across representative text, schedules, scans and mixed-content drawings. Compare actual readings, omissions, identities and connections against independently reviewed sources. Pause before introducing further custom repair logic.
 
-| Phase | Content | Exit criterion |
-|---|---|---|
-| 0 — Free fixes | `enableFormula` off for drawings; read the coverage report | Coverage 100%, tag corruption gone |
-| 1 — Contract | Add a motor tag; agree merge precedence | Customer signs both |
-| 2 — Evidence | Label 15–20 real packages with the five categories | **Go / no-go gate** |
-| 3 — Shadow | Run alongside the current pipeline, writing deliverables but not consuming them | Output compared on the same documents |
-| 4 — Cut over | Change the loop variable one content type at a time | Correction rate at or below baseline |
-| 5 — Scale | Widen the corpus and the document types | One code path |
+## Native References
 
-Phases 0 and 1 have no dependency on Phase 2 and should start immediately.
+- [CU Python SDK](https://github.com/Azure/azure-sdk-for-python/tree/main/sdk/contentunderstanding/azure-ai-contentunderstanding)
+- [CU classification and sub-page support](https://learn.microsoft.com/azure/ai-services/content-understanding/concepts/classifier)
+- [CU field extraction](https://learn.microsoft.com/azure/ai-services/content-understanding/document/overview)
+- [Azure OpenAI supported SDKs](https://learn.microsoft.com/azure/foundry/openai/supported-languages)

@@ -190,13 +190,12 @@ def score_document(label: dict[str, Any], manifest: dict[str, Any], report: Repo
 
 
 def score_job(label: dict[str, Any], job: dict[str, Any], report: Report) -> None:
-    payload = job.get("payload", {})
+    systems = job["systems"]
 
     truth_tags = {t.upper() for t in label.get("tags", [])}
     found_tags = {
-        (s.get("tag") or "").upper()
-        for s in payload.get("motors", []) + payload.get("vfds", [])
-        if s.get("tag")
+        tag.upper() for system in systems
+        for tag in (system["row"].get("tag"), system.get("motor_tag")) if tag
     }
     report.tags.tp += len(truth_tags & found_tags)
     report.tags.fp += len(found_tags - truth_tags)
@@ -204,8 +203,8 @@ def score_job(label: dict[str, Any], job: dict[str, Any], report: Report) -> Non
 
     truth_pairs = {(a.upper(), b.upper()) for a, b in label.get("pairs", [])}
     found_pairs = {
-        ((p.get("vfd_tag") or "").upper(), (p.get("motor_tag") or "").upper())
-        for p in payload.get("pairs", [])
+        ((system["row"].get("tag") or "").upper(), (system.get("motor_tag") or "").upper())
+        for system in systems
     }
     report.pairs.tp += len(truth_pairs & found_pairs)
     report.pairs.fp += len(found_pairs - truth_pairs)

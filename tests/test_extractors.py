@@ -8,6 +8,9 @@ found nothing.
 from __future__ import annotations
 
 import logging
+from unittest.mock import Mock
+
+from azure.ai.contentunderstanding.models import ArrayField, BooleanField, ObjectField, StringField
 
 from goselect_docproc.contracts import ContentType, Region, Segment, Span, WorkItem
 from goselect_docproc.extractors import (
@@ -54,20 +57,20 @@ class TestDroppedContentTypes:
         assert isinstance(extractors[ContentType.DRAWING], ModelExtractor)
 
     def test_dropping_a_plan_costs_no_model_call(self):
-        model = NullModel()
+        model = Mock()
         extractors = default_extractors(model)
         context = SegmentContext(content="0123456789", item=work_item(ContentType.PLAN))
 
         extractors[ContentType.PLAN].extract(context)
 
-        assert model.calls == []
+        model.complete_json.assert_not_called()
 
     def test_a_dropped_segment_says_so_instead_of_looking_empty(self):
         context = SegmentContext(content="0123456789", item=work_item(ContentType.PLAN))
 
         payload = default_extractors(NullModel())[ContentType.PLAN].extract(context)
 
-        assert not payload.motors and not payload.vfds and not payload.pairs
+        assert not payload.records
         assert any("not extracted" in note for note in payload.notes)
         assert any("f1-seg-004" in note for note in payload.notes)
 
@@ -109,6 +112,11 @@ class FakeProducer:
             file_id=file_id, content=CONTENT, page_count=3, content_sha256="x",
             segments=self.segments, producer=self.name,
             section_index=SectionIndex(nodes=[], strategy="none", role_headings=0),
+            fields_by_segment={segment.segment_id: {"rows": ArrayField(value_array=[ObjectField(value_object={
+                "tag": StringField(value_string="drive-X", source=f"D({segment.first_page},0,0,1,0,1,1,0,1)"),
+                "motor_tag": StringField(value_string="motor-X", source=f"D({segment.first_page},0,0,1,0,1,1,0,1)"),
+                "identified_system": BooleanField(value_boolean=segment.content_type is ContentType.SCHEDULE),
+            })])} for segment in self.segments if segment.content_type is not ContentType.PLAN},
         )
 
     def figure_image(self, analysis, figure_id):
@@ -116,7 +124,7 @@ class FakeProducer:
 
 
 def build(segments):
-    model = NullModel(CANNED)
+    model = Mock()
     pipeline = Pipeline(
         producer=FakeProducer(segments),
         extractors=default_extractors(model),
@@ -142,10 +150,10 @@ class TestDroppingIsPerObjectNotPerFile:
         manifest, job, results = pipeline.run({"f1": (b"%PDF-", "file:///a.pdf")})
         by_id = {r.segment_id: r for r in results}
 
-        assert by_id["f1-seg-002"].payload.vfds == []
-        assert by_id["f1-seg-001"].payload.vfds
-        assert by_id["f1-seg-003"].payload.vfds
-        assert job.payload.vfds, "the file must survive its plan sheet"
+        assert by_id["f1-seg-002"].payload.records == []
+        assert by_id["f1-seg-001"].payload.records
+        assert by_id["f1-seg-003"].payload.records
+        assert job.systems, "the file must survive its plan sheet"
 
     def test_the_dropped_segment_still_completes_the_job(self):
         pipeline, _ = build(self.segments())
@@ -167,7 +175,7 @@ class TestDroppingIsPerObjectNotPerFile:
 
         pipeline.run({"f1": (b"%PDF-", "file:///a.pdf")})
 
-        assert len(model.calls) == 2, "one for prose, one for the schedule, none for the plan"
+        model.complete_json.assert_not_called()
 
 
 class TestCollateralDrops:

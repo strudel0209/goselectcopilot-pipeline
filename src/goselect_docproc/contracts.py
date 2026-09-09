@@ -1,17 +1,4 @@
-"""Integration surface for the GoSelect Copilot document pipeline.
-
-Everything crossing a process, queue or service boundary is defined here. The
-orchestrator, the workers and GoSelect all speak these models and nothing else.
-
-Two layers on purpose:
-
-* ``*Raw`` models are what an LLM is asked to return - flat, shallow, every
-  field required and explicitly nullable. This is the shape that survives both
-  OpenAI ``response_format`` and Claude forced-tool-use without dropping nested
-  or null fields.
-* Domain models are what GoSelect consumes. Expansion from raw to domain is
-  deterministic Python, never a model call.
-"""
+"""Segment boundaries, evidence-bearing customer records and assembled jobs."""
 
 from __future__ import annotations
 
@@ -21,7 +8,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-SCHEMA_VERSION = "1.0.0"
+SCHEMA_VERSION = "2.0.0"
 
 
 class Strict(BaseModel):
@@ -142,6 +129,8 @@ class Segment(Strict):
     section_root: str | None = None
     regions: list[Region] = Field(default_factory=list)
     producer: str = "unknown"
+    source: str | None = None
+    source_unit: str | None = None
 
     @model_validator(mode="after")
     def _page_order(self) -> Segment:
@@ -171,7 +160,7 @@ class FileRef(Strict):
 
 
 class Coverage(Strict):
-    """Proof that segmentation did not silently drop content."""
+    """Accounting for returned markdown, not OCR completeness of the PDF."""
 
     total_chars: int
     covered_chars: int
@@ -188,7 +177,7 @@ class Coverage(Strict):
 
     @property
     def ok(self) -> bool:
-        return self.unexplained_chars == 0
+        return self.total_chars > 0 and self.unexplained_chars == 0
 
 
 class Manifest(Strict):
@@ -239,6 +228,8 @@ class WorkItem(Strict):
     figures: list[str] = Field(default_factory=list, description="DI figure ids on this segment")
     high_resolution: bool = False
     formulas: bool = False
+    source: str | None = None
+    source_unit: str | None = None
 
     @property
     def dedupe_id(self) -> str:
@@ -286,81 +277,20 @@ class SegmentResult(Strict):
 # ---------------------------------------------------------------------------
 
 
-class Quantity(Strict):
-    value: float | None = None
-    unit: str | None = None
-    raw: str | None = None
-
-
-class MotorSpec(Strict):
-    tag: str | None = None
-    power: Quantity = Field(default_factory=Quantity)
-    voltage: Quantity = Field(default_factory=Quantity)
-    frequency: Quantity = Field(default_factory=Quantity)
-    speed: Quantity = Field(default_factory=Quantity)
-    poles: int | None = None
-    frame_size: str | None = None
-    mounting: str | None = None
-    ingress_protection: str | None = None
-    insulation_class: str | None = None
-    efficiency_class: str | None = None
-    cooling: str | None = None
-    hazardous_area: str | None = None
-    evidence: list[Evidence] = Field(default_factory=list)
-
-
-class VfdSpec(Strict):
-    tag: str | None = None
-    power: Quantity = Field(default_factory=Quantity)
-    voltage: Quantity = Field(default_factory=Quantity)
-    current: Quantity = Field(default_factory=Quantity)
-    enclosure: str | None = None
-    control_mode: str | None = None
-    filter: str | None = None
-    evidence: list[Evidence] = Field(default_factory=list)
-
-
-class ApplicationSpec(Strict):
-    process: str | None = None
-    load_type: str | None = None
-    duty_cycle: str | None = None
-    ambient_temperature: Quantity = Field(default_factory=Quantity)
-    altitude: Quantity = Field(default_factory=Quantity)
-    hazardous_area: str | None = None
-    standards: list[str] = Field(default_factory=list)
-    evidence: list[Evidence] = Field(default_factory=list)
-
-
-class Pair(Strict):
-    """A VFD-motor pairing. ``origin`` records which segment type asserted it."""
-
-    pair_id: str
-    vfd_tag: str | None = None
+class ExtractionRecord(Strict):
+    row: dict
     motor_tag: str | None = None
-    origin: ContentType
-    confidence: float = Field(ge=0.0, le=1.0, default=0.0)
-    evidence: list[Evidence] = Field(default_factory=list)
-
-    @property
-    def key(self) -> tuple[str | None, str | None]:
-        return self.vfd_tag, self.motor_tag
+    identified_system: bool = False
+    origin: ContentType = ContentType.OTHER
+    sources: list[str] = Field(default_factory=list)
+    evidence: dict[str, list[Evidence]] = Field(default_factory=dict)
+    scopes: dict[str, Evidence] = Field(default_factory=dict)
+    issues: list[str] = Field(default_factory=list)
 
 
 class ExtractionPayload(Strict):
-    motors: list[MotorSpec] = Field(default_factory=list)
-    vfds: list[VfdSpec] = Field(default_factory=list)
-    applications: list[ApplicationSpec] = Field(default_factory=list)
-    pairs: list[Pair] = Field(default_factory=list)
+    records: list[ExtractionRecord] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
-    contract_rows: list[dict] = Field(default_factory=list)
-    contract_row_sources: list[str] = Field(default_factory=list)
-    """Segment id per contract row. Rows from one segment are distinct items."""
-    """The service's own contract-shaped rows, unwrapped but not reinterpreted.
-
-    The domain models above are deliberately narrow - they carry only what the
-    reconciliation logic needs. Rebuilding the agreed schema from them would
-    silently drop every field the logic does not use, so the deliverable is
-    built from these instead."""
 
 
 class Conflict(Strict):
@@ -380,7 +310,10 @@ class JobResult(Strict):
     segments_expected: int
     segments_done: int
     segments_failed: int
-    payload: ExtractionPayload
+    segments_review: int = 0
+    systems: list[ExtractionRecord] = Field(default_factory=list)
+    unassigned: list[ExtractionRecord] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
     conflicts: list[Conflict] = Field(default_factory=list)
     review_required: list[str] = Field(default_factory=list)
     coverage: dict[str, Coverage] = Field(default_factory=dict)

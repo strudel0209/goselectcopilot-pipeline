@@ -1,23 +1,34 @@
-"""Page rasterising for drawing extraction.
-
-Document Intelligence serves server-side figure crops, but they come back around
-1480x990 - already below the resolution a tag needs to survive. Content
-Understanding returns no image bytes at all: its figure output is a description
-plus chart.js or mermaid, and the supported figure types are business charts
-(bar, line, pie, radar, scatter, bubble, quadrant, mixed, flow, sequence, Gantt).
-An electrical one-line is none of those.
-
-So the drawing image has to come from the source PDF, at a resolution we choose,
-independent of which engine did the segmentation. That is all this module does.
-"""
+"""Render source PDF regions at a controlled resolution for drawing extraction."""
 
 from __future__ import annotations
 
 import logging
+from io import BytesIO
+from math import isfinite
+
+import pymupdf
+from PIL import Image, ImageDraw
 
 log = logging.getLogger(__name__)
 
 DEFAULT_DPI = 300
+
+
+def parse_source(source: str | None) -> tuple[int | None, list[float] | None]:
+    """Read the first native document source expression."""
+    first = (source or "").split(";")[0].strip()
+    if not first.startswith("D(") or not first.endswith(")"):
+        return None, None
+    try:
+        values = [float(part) for part in first[2:-1].split(",")]
+        page, *polygon = values
+        if not all(isfinite(value) for value in values) or page < 1 or not page.is_integer():
+            return None, None
+        if polygon and (len(polygon) < 8 or len(polygon) % 2):
+            return None, None
+        return int(page), polygon or None
+    except ValueError:
+        return None, None
 
 
 def render_page(data: bytes, page_number: int, dpi: int = DEFAULT_DPI) -> bytes | None:
@@ -40,11 +51,43 @@ def render_page(data: bytes, page_number: int, dpi: int = DEFAULT_DPI) -> bytes 
         return None
 
 
-def render_pages(data: bytes, first: int, last: int, dpi: int = DEFAULT_DPI) -> dict[str, bytes]:
-    """Render an inclusive page range, keyed ``page-<n>`` to match figure ids."""
+def render_pages(
+    data: bytes, first: int, last: int, dpi: int = DEFAULT_DPI,
+    *, source: str | None = None, unit: str | None = None,
+) -> dict[str, bytes]:
+    """Crop and mask source polygons, or render full pages when no source exists."""
     images: dict[str, bytes] = {}
-    for page_number in range(first, last + 1):
-        png = render_page(data, page_number, dpi)
-        if png:
-            images[f"page-{page_number}"] = png
+    regions = [parse_source(part) for part in source.split(";")] if source else [
+        (page_number, None) for page_number in range(first, last + 1)
+    ]
+    with pymupdf.open(stream=data, filetype="pdf") as document:
+        for index, (page_number, polygon) in enumerate(regions):
+            if page_number is None or not first <= page_number <= last or page_number > len(document):
+                raise ValueError("Invalid drawing source page")
+            page = document[page_number - 1]
+            clip = None
+            if polygon:
+                if unit != "inch":
+                    raise ValueError(f"Unsupported PDF source unit: {unit!r}")
+                points = list(zip(polygon[::2], polygon[1::2]))
+                clip = pymupdf.Rect(
+                    min(point[0] for point in points) * 72,
+                    min(point[1] for point in points) * 72,
+                    max(point[0] for point in points) * 72,
+                    max(point[1] for point in points) * 72,
+                ) & page.rect
+                if clip.is_empty:
+                    raise ValueError("Drawing source lies outside the PDF page")
+            pixmap = page.get_pixmap(dpi=dpi, clip=clip)
+            image = Image.frombytes("RGB", (pixmap.width, pixmap.height), pixmap.samples)
+            if polygon:
+                mask = Image.new("L", image.size)
+                ImageDraw.Draw(mask).polygon(
+                    [(horizontal * dpi - pixmap.x, vertical * dpi - pixmap.y) for horizontal, vertical in points],
+                    fill=255,
+                )
+                image = Image.composite(image, Image.new("RGB", image.size, "white"), mask)
+            output = BytesIO()
+            image.save(output, format="PNG")
+            images[f"page-{page_number}-region-{index}"] = output.getvalue()
     return images

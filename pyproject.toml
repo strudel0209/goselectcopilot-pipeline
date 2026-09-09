@@ -11,7 +11,7 @@ requires-python = ">=3.11"
 dynamic = ["dependencies"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.2"]
+dev = ["pytest>=8.2", "ipykernel>=6.29"]
 
 [tool.setuptools.dynamic]
 dependencies = { file = ["requirements.txt"] }

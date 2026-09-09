@@ -104,6 +104,19 @@ class TestContentUnderstanding:
         assert analysis.content
         assert analysis.page_count == 2
 
+    def test_raw_response_replay_avoids_another_analyze_request(self, document, tmp_path):
+        client = FakeCU(AnalysisResult(contents=[document]))
+        producer = ContentUnderstandingProducer(client, cache_dir=tmp_path / "configuration-a")
+        original = producer.analyze("f1", b"pdf")
+        replay = producer.analyze("f2", b"pdf")
+        assert len(client.calls) == 1
+        assert replay.cache_hit
+        assert replay.cost.api_calls == 0
+        assert replay.response.as_dict() == original.response.as_dict()
+        assert replay.segments[0].file_id == "f2"
+        ContentUnderstandingProducer(client, cache_dir=tmp_path / "configuration-b").analyze("f1", b"pdf")
+        assert len(client.calls) == 2
+
     def test_segment_spans_come_from_the_classifier(self, producer):
         analysis = producer.analyze("f1", b"%PDF-fake")
         assert analysis.segments[0].start == 0
@@ -138,11 +151,47 @@ class TestContentUnderstanding:
             for b in spans[i + 1 :]:
                 assert not overlaps([a], [b])
 
+    def test_subpage_sources_and_claim_intersections_survive(self, document):
+        from goselect_docproc.producers.content_understanding import _regions_for
+
+        document.unit = "inch"
+        document.segments[1].source = "D(2,0,0,1,0,1,1,0,1)"
+        analysis = ContentUnderstandingProducer(FakeCU(AnalysisResult(contents=[document]))).analyze("f1", b"pdf")
+        assert analysis.segments[1].source == document.segments[1].source
+        assert analysis.segments[1].source_unit == "inch"
+        regions = _regions_for([(0, 100, 1, ContentType.TEXT)], 30, 60, ContentType.TEXT)
+        assert [span.as_tuple() for region in regions for span in region.spans] == [(30, 30)]
+
     def test_empty_analysis_scores_zero_coverage_not_one(self, producer):
         from goselect_docproc.contracts import Coverage
 
-        assert Coverage(total_chars=0, covered_chars=0, furniture_chars=0,
-                        unexplained_chars=0).accounted_ratio == 0.0
+        coverage = Coverage(total_chars=0, covered_chars=0, furniture_chars=0, unexplained_chars=0)
+        assert coverage.accounted_ratio == 0.0
+        assert not coverage.ok
+
+    def test_furniture_overlap_does_not_hide_unclaimed_text(self, producer):
+        from goselect_docproc.contracts import Span
+
+        analysis = producer.analyze("f1", b"pdf")
+        analysis.content = "Header\nUNCLAIMED RATING 480 V"
+        analysis.segments = []
+        analysis.furniture_spans = [Span(offset=0, length=6)]
+
+        coverage = analysis.coverage()
+
+        assert not coverage.ok
+        assert coverage.furniture_chars == 6
+        assert coverage.unexplained_chars == len(analysis.content) - 6
+
+    def test_extraction_plan_rejects_unassigned_markdown(self, producer):
+        from goselect_docproc.pipeline import Pipeline
+
+        pipeline = Pipeline(producer=producer, extractors={})
+        manifest = pipeline.segment({"f1": (b"pdf", "local")})
+        manifest.coverage["f1"].unexplained_chars = 1
+
+        with pytest.raises(ValueError, match="Unassigned markdown"):
+            pipeline.plan(manifest)
 
 
 class TestContentUnderstandingSections:
@@ -251,8 +300,8 @@ class TestRouterAnalyzerDefinition:
         """The service default is on, and it reads a boxed tag as a radical."""
         assert analyzer.config.enable_formula is False
 
-    def test_in_page_segments_is_opt_in(self):
-        assert router_analyzer().config.allow_in_page_segments is False
+    def test_in_page_segments_is_on_by_default(self):
+        assert router_analyzer().config.allow_in_page_segments is True
         assert router_analyzer(in_page_segments=True).config.allow_in_page_segments is True
 
     def test_completion_model_is_declared(self, analyzer):

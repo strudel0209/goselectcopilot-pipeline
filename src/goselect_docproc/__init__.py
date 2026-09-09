@@ -17,7 +17,6 @@ from .contracts import (
     Status,
     WorkItem,
 )
-from .pipeline import Pipeline, PipelineConfig
 
 __version__ = "0.1.0"
 
@@ -28,8 +27,6 @@ __all__ = [
     "ExtractionPayload",
     "JobResult",
     "Manifest",
-    "Pipeline",
-    "PipelineConfig",
     "Region",
     "Segment",
     "SegmentResult",

@@ -1,262 +1,155 @@
-"""Reassembly and cross-segment merge.
+"""Assemble once; keep source observations in worker results, not duplicate models."""
 
-Segments are span ranges over one immutable ``content`` string, never copies of
-it. Workers may therefore finish in any order across any number of queues: the
-global ordering key is ``(file_ordinal, span_offset)`` and reassembly is a sort.
-
-Page number is **not** a valid ordering key - intra-page regions share one.
-
-Merge precedence is stated, not implicit:
-
-* numeric specifications  -> SCHEDULE > TEXT > DRAWING  (grids are authoritative)
-* pairing / topology      -> DRAWING > SCHEDULE > TEXT  (the diagram shows wiring)
-
-Disagreement is recorded as a ``Conflict`` and routed to review. It is never
-silently resolved.
-"""
-
-from __future__ import annotations
-
+from copy import deepcopy
 from datetime import datetime, timezone
 
-from .contracts import (
-    Conflict,
-    ContentType,
-    Coverage,
-    Evidence,
-    ExtractionPayload,
-    JobResult,
-    Manifest,
-    MotorSpec,
-    Pair,
-    Quantity,
-    SegmentResult,
-    Status,
-    VfdSpec,
-)
+from .contracts import Conflict, ContentType, ExtractionRecord, JobResult, Manifest, SegmentResult, Status
+from .field_schema import empty_contract_row, flat_fields, get_field, scope_paths, set_field
 from .spans import text_for
 
-SPEC_PRECEDENCE = (ContentType.SCHEDULE, ContentType.TEXT, ContentType.DRAWING)
-PAIR_PRECEDENCE = (ContentType.DRAWING, ContentType.SCHEDULE, ContentType.TEXT)
+
+SPEC_PRECEDENCE = (ContentType.SCHEDULE, ContentType.TEXT, ContentType.DRAWING, ContentType.OTHER)
 
 
 def document_order(manifest: Manifest, results: list[SegmentResult]) -> list[SegmentResult]:
-    ordinals = {f.file_id: f.ordinal for f in manifest.files}
-    return sorted(results, key=lambda r: (ordinals.get(r.file_id, r.file_ordinal), r.start_offset))
-
-
-def reassemble_markdown(manifest: Manifest, content_by_file: dict[str, str], separator: str = "\n\n") -> str:
-    """Rebuild readable document order for audit and human review.
-
-    The canonical markdown is never mutated, so this is a projection, not a
-    merge. Only build it for a consumer that actually reads prose.
-    """
-    chunks: list[str] = []
-    for segment in sorted(manifest.segments, key=manifest.sort_key):
-        content = content_by_file.get(segment.file_id)
-        if not content:
-            continue
-        spans = [s.as_tuple() for r in segment.regions for s in r.spans]
-        if spans:
-            chunks.append(text_for(content, spans))
-    return separator.join(chunks)
+    latest = {result.segment_id: result for result in results}
+    return sorted(latest.values(), key=lambda result: (
+        manifest.file(result.file_id).ordinal, result.start_offset, result.segment_id,
+    ))
 
 
 def completion(manifest: Manifest, results: list[SegmentResult]) -> tuple[int, int, int]:
-    """``(expected, done, failed)`` counted from **distinct** segment ids.
-
-    Counting distinct documents rather than incrementing a counter is what makes
-    at-least-once delivery harmless.
-    """
-    seen: dict[str, SegmentResult] = {}
-    for r in results:
-        if r.status.terminal or r.segment_id not in seen:
-            seen[r.segment_id] = r
-    done = sum(1 for r in seen.values() if r.status is Status.DONE)
-    failed = sum(1 for r in seen.values() if r.status is Status.FAILED)
-    return manifest.expected_units, done, failed
+    results = document_order(manifest, results)
+    return manifest.expected_units, sum(result.status is Status.DONE for result in results), sum(result.status is Status.FAILED for result in results)
 
 
-def _rank(origin: ContentType, order: tuple[ContentType, ...]) -> int:
-    return order.index(origin) if origin in order else len(order)
+def reassemble_markdown(manifest: Manifest, content_by_file: dict[str, str], separator: str = "\n\n") -> str:
+    return separator.join(text_for(content_by_file[segment.file_id], [span.as_tuple() for region in segment.regions for span in region.spans])
+                          for segment in sorted(manifest.segments, key=manifest.sort_key))
 
 
-# Not a tag: the key under which untagged project-wide requirements consolidate.
-UNTAGGED = "\x00project"
+def has_value(value) -> bool:
+    if isinstance(value, dict):
+        return has_value(value.get("value")) or has_value(value.get("details"))
+    return value not in (None, "", [], {})
 
 
-def _merge_quantity(current: Quantity, incoming: Quantity, take: bool) -> Quantity:
-    if take and (incoming.value is not None or incoming.raw):
-        return incoming
-    return current
+def reading_paths() -> list[str]:
+    return list(dict.fromkeys(path.rsplit(".", 1)[0] if path.endswith((".value", ".unit", ".details", ".reference")) else path
+                              for path in flat_fields()))
 
 
-def _merge_specs(items: list[tuple[ContentType, MotorSpec | VfdSpec]], conflicts: list[Conflict]):
-    """Merge same-tag specs, preferring the highest-precedence non-null value.
-
-    Specs with no tag are **project-level requirements**, not noise: a Division 16
-    clause such as "VFDs shall be ABB ACQ580, no equal" applies to every drive on
-    the job and names none of them. They consolidate into a single untagged spec
-    rather than being dropped, which is what previously discarded an entire
-    specification section.
-    """
-    by_tag: dict[str, tuple[ContentType, MotorSpec | VfdSpec]] = {}
-    for origin, spec in items:
-        tag = (spec.tag or "").strip().upper()
-        key = tag or UNTAGGED
-        label = tag or "<project>"
-        if key not in by_tag:
-            by_tag[key] = (origin, spec.model_copy(deep=True))
-            continue
-
-        held_origin, held = by_tag[key]
-        take = _rank(origin, SPEC_PRECEDENCE) < _rank(held_origin, SPEC_PRECEDENCE)
-
-        for name, field in type(held).model_fields.items():
-            if name in {"tag", "evidence"}:
+def merge_records(records: list[ExtractionRecord], conflicts: list[Conflict]) -> ExtractionRecord:
+    records = sorted(records, key=lambda record: SPEC_PRECEDENCE.index(record.origin))
+    merged = records[0].model_copy(deep=True)
+    origins = {path: merged.origin for path in reading_paths()}
+    for incoming in records[1:]:
+        for path in reading_paths():
+            value, held = get_field(incoming.row, path), get_field(merged.row, path)
+            if not has_value(value):
                 continue
-            incoming_value = getattr(spec, name)
-            held_value = getattr(held, name)
-            if isinstance(held_value, Quantity):
-                merged = _merge_quantity(held_value, incoming_value, take)
-                if (
-                    held_value.value is not None
-                    and incoming_value.value is not None
-                    and held_value.value != incoming_value.value
-                ):
-                    conflicts.append(
-                        Conflict(
-                            field=f"{label}.{name}",
-                            values=[str(held_value.value), str(incoming_value.value)],
-                            origins=[held_origin, origin],
-                        )
-                    )
-                setattr(held, name, merged)
-            elif isinstance(held_value, list):
-                setattr(held, name, held_value + [v for v in incoming_value if v not in held_value])
-            else:
-                if held_value is None:
-                    setattr(held, name, incoming_value)
-                elif incoming_value is not None and incoming_value != held_value:
-                    conflicts.append(
-                        Conflict(
-                            field=f"{label}.{name}",
-                            values=[str(held_value), str(incoming_value)],
-                            origins=[held_origin, origin],
-                        )
-                    )
-                    if take:
-                        setattr(held, name, incoming_value)
-
-        held.evidence = _dedupe_evidence(held.evidence + spec.evidence)
-        if take:
-            by_tag[key] = (origin, held)
-
-    return [spec for _, spec in by_tag.values()]
+            if not has_value(held):
+                set_field(merged.row, path, deepcopy(value))
+                origins[path] = incoming.origin
+            elif isinstance(value, list):
+                set_field(merged.row, path, list(dict.fromkeys(held + value)))
+            elif path == "notes":
+                merged.row[path] = "\n".join(dict.fromkeys([held, value]))
+            elif path != "tag":
+                previous = (held.get("value"), held.get("unit")) if isinstance(held, dict) else held
+                candidate = (value.get("value"), value.get("unit")) if isinstance(value, dict) else value
+                if previous != candidate:
+                    conflicts.append(Conflict(field=f"{merged.row['tag']}.{path}", values=[str(held), str(value)], origins=[origins[path], incoming.origin]))
+        merged.motor_tag = merged.motor_tag or incoming.motor_tag
+        merged.identified_system |= incoming.identified_system
+        merged.sources = list(dict.fromkeys(merged.sources + incoming.sources))
+        merged.issues = list(dict.fromkeys(merged.issues + incoming.issues))
+        for path, evidence in incoming.evidence.items():
+            held = merged.evidence.setdefault(path, [])
+            held.extend(item for item in evidence if item not in held)
+        merged.scopes.update(incoming.scopes)
+    return merged
 
 
-def _dedupe_evidence(items: list[Evidence]) -> list[Evidence]:
-    seen: dict[tuple, Evidence] = {}
-    for e in items:
-        key = (e.file_id, e.page, tuple(s.as_tuple() for s in e.spans), e.source)
-        seen.setdefault(key, e)
-    return sorted(seen.values(), key=lambda e: (e.file_id, e.start))
-
-
-def _merge_pairs(pairs: list[Pair]) -> list[Pair]:
-    """Corroboration across segment types raises confidence; it never invents pairs."""
-    grouped: dict[tuple, list[Pair]] = {}
-    for p in pairs:
-        key = (
-            (p.vfd_tag or "").strip().upper() or None,
-            (p.motor_tag or "").strip().upper() or None,
-        )
-        grouped.setdefault(key, []).append(p)
-
-    merged: list[Pair] = []
-    for key, group in grouped.items():
-        best = min(group, key=lambda p: _rank(p.origin, PAIR_PRECEDENCE))
-        origins = {p.origin for p in group}
-        corroboration = min(0.15 * (len(origins) - 1), 0.3)
-        merged.append(
-            Pair(
-                pair_id=best.pair_id,
-                vfd_tag=key[0],
-                motor_tag=key[1],
-                origin=best.origin,
-                confidence=round(min(1.0, max(p.confidence for p in group) + corroboration), 3),
-                evidence=_dedupe_evidence([e for p in group for e in p.evidence]),
-            )
-        )
-    return sorted(merged, key=lambda p: (p.vfd_tag or "", p.motor_tag or ""))
-
-
-def merge(
-    manifest: Manifest,
-    results: list[SegmentResult],
-    review_threshold: float = 0.25,
-) -> JobResult:
+def merge(manifest: Manifest, results: list[SegmentResult], review_threshold: float = 0.25) -> JobResult:
+    segments = {segment.segment_id: segment for segment in manifest.segments}
+    for result in results:
+        segment = segments.get(result.segment_id)
+        if (result.job_id != manifest.job_id or not segment or result.file_id != segment.file_id
+                or result.content_type is not segment.content_type):
+            raise ValueError("Results must belong to this manifest")
     ordered = document_order(manifest, results)
-    expected, done, failed = completion(manifest, results)
-    conflicts: list[Conflict] = []
-
-    motors, vfds, applications, pairs, notes = [], [], [], [], []
-    unverified: list[str] = []
-    for r in ordered:
-        # REVIEW is included on purpose. Its payload is exactly what a human has to
-        # check; discarding it hands the reviewer a blank page and the extraction
-        # gets redone by hand. FAILED has nothing to contribute.
-        if r.status is Status.FAILED or r.payload is None:
+    expected, done, failed = completion(manifest, ordered)
+    records, notes, review, trusted = [], [], [], set()
+    for result in ordered:
+        segment = segments[result.segment_id]
+        if result.status is not Status.DONE or segment.confidence < review_threshold:
+            review.append(f"{result.segment_id}: {result.status.value}; " + "; ".join(result.errors))
+        else:
+            trusted.add(result.segment_id)
+        if result.payload and result.status is not Status.FAILED:
+            notes.extend(result.payload.notes)
+            for original in result.payload.records:
+                record = original.model_copy(deep=True)
+                record.origin, record.sources = result.content_type, [result.segment_id]
+                record.scopes = {path: evidence for path, evidence in record.scopes.items()
+                                 if result.segment_id in trusted and evidence.file_id == result.file_id}
+                records.append(record)
+    groups, unassigned, shared = [], [], []
+    for record in records:
+        tag = (record.row.get("tag") or "").strip()
+        if not tag or not record.identified_system or record.origin not in {ContentType.SCHEDULE, ContentType.DRAWING}:
+            unassigned.append(record)
             continue
-        if r.status is Status.REVIEW:
-            unverified.append(r.segment_id)
-        motors += [(r.content_type, m) for m in r.payload.motors]
-        vfds += [(r.content_type, v) for v in r.payload.vfds]
-        applications += r.payload.applications
-        pairs += r.payload.pairs
-        notes += r.payload.notes
-
-    if unverified:
-        notes.append(
-            "Unverified content from segments needing review: " + ", ".join(unverified)
-        )
-
-    payload = ExtractionPayload(
-        motors=_merge_specs(motors, conflicts),
-        vfds=_merge_specs(vfds, conflicts),
-        applications=applications,
-        pairs=_merge_pairs(pairs),
-        notes=notes,
-        contract_rows=[
-            row for r in ordered if r.payload for row in r.payload.contract_rows
-        ],
-        contract_row_sources=[
-            r.segment_id for r in ordered if r.payload for _ in r.payload.contract_rows
-        ],
-    )
-
-    review = [s.segment_id for s in manifest.segments if s.confidence < review_threshold]
-    review += [r.segment_id for r in ordered if r.status in {Status.FAILED, Status.REVIEW}]
-    review += [c.field for c in conflicts]
-
-    status = Status.DONE if done == expected and not failed else Status.REVIEW
-    # FAILED means nothing usable came back. A segment held for review still
-    # carries its payload, so a package that is entirely under review is not a
-    # failed job - the default posture is partial, flagged, held.
-    terminal = {r.segment_id: r for r in ordered if r.status.terminal}
-    if not any(r.status is not Status.FAILED for r in terminal.values()):
+        matches = [group for group in groups if group[0].row["tag"].strip().casefold() == tag.casefold()
+                   and not (record.motor_tag and any(member.motor_tag and member.motor_tag != record.motor_tag for member in group))
+                   and not (record.origin is ContentType.SCHEDULE and any(set(member.sources) & set(record.sources) for member in group))]
+        if len(matches) == 1:
+            matches[0].append(record)
+        else:
+            groups.append([record])
+    confirmed = [group for group in groups if any(record.sources[0] in trusted for record in group)]
+    if confirmed:
+        for record in unassigned:
+            if record.origin is not ContentType.TEXT or record.row.get("tag"):
+                continue
+            projection = ExtractionRecord(row=empty_contract_row(), origin=record.origin, sources=record.sources)
+            for path, evidence in list(record.scopes.items()):
+                if path not in scope_paths() or not has_value(get_field(record.row, path)):
+                    continue
+                set_field(projection.row, path, deepcopy(get_field(record.row, path)))
+                projection.scopes[path] = evidence
+                for key in list(record.evidence):
+                    if key == path or key.startswith(path + "."):
+                        projection.evidence[key] = record.evidence.pop(key)
+                set_field(record.row, path, get_field(empty_contract_row(), path))
+                record.scopes.pop(path)
+            if projection.scopes:
+                shared.append(projection)
+    conflicts = []
+    systems = [merge_records(group + (shared if group in confirmed else []), conflicts) for group in groups]
+    unassigned = [record for record in unassigned if any(has_value(get_field(record.row, path)) for path in reading_paths())]
+    for system in systems:
+        if not system.motor_tag:
+            system.issues.append("Motor identifier not extracted")
+        if any(evidence.source == "derived" for values in system.evidence.values() for evidence in values):
+            system.issues.append("Verify drawing model readings and motor connection against source image")
+        if sum(other.row["tag"] == system.row["tag"] for other in systems) > 1:
+            system.issues.append("Repeated identifier or different motor endpoints; records kept separate")
+        review.extend(f"{system.row['tag']}: {issue}" for issue in system.issues)
+    if unassigned:
+        review.append("Unassigned observations or requirements need applicability review")
+    if not systems:
+        review.append("No identified VFD systems extracted")
+    review.extend(conflict.field for conflict in conflicts)
+    review.extend(f"{file_id}: incomplete returned-markdown coverage" for file_id, coverage in manifest.coverage.items() if not coverage.ok)
+    review.extend(f"{segment_id}: missing result" for segment_id in segments.keys() - {result.segment_id for result in ordered})
+    status = Status.DONE if done == expected and not review else Status.REVIEW
+    if not any(result.status is not Status.FAILED for result in ordered):
         status = Status.FAILED
-
-    return JobResult(
-        job_id=manifest.job_id,
-        correlation_id=manifest.correlation_id,
-        status=status,
-        segments_expected=expected,
-        segments_done=done,
-        segments_failed=failed,
-        payload=payload,
-        conflicts=conflicts,
-        review_required=sorted(set(review)),
-        coverage=manifest.coverage,
-        completed_at=datetime.now(timezone.utc),
-    )
+    return JobResult(job_id=manifest.job_id, correlation_id=manifest.correlation_id, status=status,
+                     segments_expected=expected, segments_done=done, segments_failed=failed,
+                     segments_review=sum(result.status is Status.REVIEW for result in ordered),
+                     systems=systems, unassigned=unassigned, notes=list(dict.fromkeys(notes)),
+                     conflicts=conflicts, review_required=sorted(set(review)), coverage=manifest.coverage,
+                     completed_at=datetime.now(timezone.utc))

@@ -20,6 +20,8 @@ from __future__ import annotations
 import hashlib
 import logging
 from collections.abc import Mapping
+import json
+from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
 from azure.ai.contentunderstanding.models import (
@@ -134,33 +136,13 @@ def field_analyzer(
     )
 
 
-def schedule_analyzer(completion_model: str = DEFAULT_COMPLETION_MODEL) -> ContentAnalyzer:
-    from ..field_schema import schedule_schema
-
-    return field_analyzer(schedule_schema(), completion_model)
-
-
-def text_analyzer(completion_model: str = DEFAULT_COMPLETION_MODEL) -> ContentAnalyzer:
-    from ..field_schema import text_schema
-
-    return field_analyzer(text_schema(), completion_model)
-
-
 def router_analyzer(
     completion_model: str = DEFAULT_COMPLETION_MODEL,
     *,
-    in_page_segments: bool = False,
+    in_page_segments: bool = True,
     field_analyzer_ids: Mapping[str, str] | None = None,
 ) -> ContentAnalyzer:
-    """The classify-and-split analyzer.
-
-    ``field_analyzer_ids`` maps a category to its own sub-analyzer, so prose and
-    grids are extracted against different schemas in the same call. One shared
-    schema does not work: the full contract is 112 fields, and asking for all of
-    them per row truncates the document before the motor block is reached.
-    Drawings are deliberately not routed - they need native resolution tiles the
-    service will not produce - and plans are out of scope.
-    """
+    """Native sub-page classification; text and schedules share one field analyzer."""
     routes = field_analyzer_ids or {}
     categories = {
         name: ContentCategoryDefinition(
@@ -193,6 +175,33 @@ class AnalyzeClient(Protocol):
     def begin_analyze_binary(self, analyzer_id: str, binary_input: bytes, **kwargs: Any) -> Any: ...
 
     def begin_analyze(self, analyzer_id: str, **kwargs: Any) -> Any: ...
+
+
+def analyzer_configuration(client: Any, analyzer_id: str) -> dict:
+    """Read-only compatibility check before analysis or reuse of cached results."""
+    from ..field_schema import load_field_schema
+
+    router = client.get_analyzer(analyzer_id)
+    config = router.config
+    if not config or not config.enable_segment or not config.allow_in_page_segments or config.segment_per_page:
+        raise ValueError("Router requires native in-page segmentation; run explicit analyzer setup")
+    categories = config.content_categories or {}
+    if set(categories) != set(DOCUMENT_CATEGORIES):
+        raise ValueError("Router categories do not match this pipeline; run explicit analyzer setup")
+    if any(categories[kind].analyzer_id for kind in ("plan", "drawing", "other")):
+        raise ValueError("Only text and schedule may route to a CU field analyzer")
+    definitions = {analyzer_id: router.as_dict()}
+    for category in FIELD_ROUTED_CATEGORIES:
+        routed_id = categories[category].analyzer_id
+        if not routed_id:
+            raise ValueError(f"{category} has no field analyzer; run explicit analyzer setup")
+        analyzer = client.get_analyzer(routed_id)
+        if not analyzer.field_schema or analyzer.field_schema.as_dict() != load_field_schema().as_dict():
+            raise ValueError(f"{routed_id} uses an incompatible field schema; run explicit analyzer setup")
+        if not analyzer.config or not analyzer.config.estimate_field_source_and_confidence:
+            raise ValueError(f"{routed_id} must return native field evidence")
+        definitions[routed_id] = analyzer.as_dict()
+    return definitions
 
 
 def ensure_analyzer(
@@ -228,13 +237,26 @@ class ContentUnderstandingProducer:
         client: AnalyzeClient,
         analyzer_id: str = DEFAULT_ANALYZER_ID,
         usd_per_page: float = USD_PER_PAGE,
+        cache_dir: Path | None = None,
     ) -> None:
         self.client = client
         self.analyzer_id = analyzer_id
         self.usd_per_page = usd_per_page
+        self.cache_dir = cache_dir
 
     def analyze(self, file_id: str, data: bytes, source_uri: str | None = None) -> DocumentAnalysis:
-        response = self._call(data, source_uri)
+        """Cache directories must be scoped to the endpoint and analyzer configuration."""
+        digest = hashlib.sha256(data).hexdigest()
+        cache_path = self.cache_dir / f"{digest}.json" if self.cache_dir else None
+        cache_hit = bool(cache_path and cache_path.exists())
+        if cache_hit:
+            saved = json.loads(cache_path.read_text(encoding="utf-8"))
+            response, usage = AnalysisResult(saved["result"]), saved["usage"]
+        else:
+            response, usage = self._call(data, source_uri)
+            if cache_path:
+                cache_path.parent.mkdir(parents=True, exist_ok=True)
+                cache_path.write_text(json.dumps({"result": response.as_dict(), "usage": usage}), encoding="utf-8")
         item = _first_document(response)
         if item is None:
             raise RuntimeError("content understanding returned no document content")
@@ -252,6 +274,7 @@ class ContentUnderstandingProducer:
 
         index_ = _section_index_from(item, page_of)
         for segment in segments:
+            segment.source_unit = item.unit
             segment.section_root = index_.root_for(
                 segment.start, inherits=segment.content_type not in SELF_TITLING
             )
@@ -261,30 +284,37 @@ class ContentUnderstandingProducer:
             file_id=file_id,
             content=content,
             page_count=page_count,
-            content_sha256=hashlib.sha256(data).hexdigest(),
+            content_sha256=digest,
             segments=segments,
             section_index=index_,
             producer=self.name,
             cost=ProducerCost(
                 pages=page_count,
-                api_calls=1,
-                usd_estimate=round(page_count * self.usd_per_page, 6),
+                api_calls=0 if cache_hit else 1,
+                usd_estimate=0 if cache_hit else round(page_count * self.usd_per_page, 6),
+                notes=("Cached response; no analyze request",) if cache_hit else ("Estimate excludes model token charges",),
             ),
             figure_ids_by_segment={},
             fields_by_segment=_fields_by_segment(response, item, blocks, segments),
             furniture_spans=[Span(offset=o, length=l) for o, l, _, kind in claims if kind is None],
             native=item,
+            response=response,
+            usage=usage,
+            cache_hit=cache_hit,
+            warnings=[json.dumps(warning, ensure_ascii=True) for warning in response.as_dict().get("warnings", [])],
         )
 
-    def _call(self, data: bytes, source_uri: str | None) -> AnalysisResult:
+    def _call(self, data: bytes, source_uri: str | None) -> tuple[AnalysisResult, dict[str, Any]]:
         """A URL is the documented input; binary upload is first-class too."""
         if source_uri and source_uri.startswith(("http://", "https://")):
             poller = self.client.begin_analyze(
-                self.analyzer_id, inputs=[AnalysisInput(url=source_uri)]
+                self.analyzer_id, inputs=[AnalysisInput(url=source_uri)], allow_input_truncation=False,
             )
         else:
-            poller = self.client.begin_analyze_binary(self.analyzer_id, binary_input=data)
-        return poller.result()
+            poller = self.client.begin_analyze_binary(self.analyzer_id, binary_input=data, allow_input_truncation=False)
+        result = poller.result()
+        usage = getattr(poller, "usage", None)
+        return result, usage.as_dict() if usage else {}
 
     def _segment(self, file_id: str, index: int, block: Any, claims: list[_Claim]) -> Segment:
         span = block.span or ContentSpan(offset=0, length=0)
@@ -315,6 +345,7 @@ class ContentUnderstandingProducer:
             page_confidences=[1.0] * (last - first + 1),
             regions=_regions_for(claims, offset, offset + int(span.length or 0), content_type),
             producer=self.name,
+            source=block.source,
         )
 
     def figure_image(self, analysis: DocumentAnalysis, figure_id: str) -> bytes | None:
@@ -374,18 +405,14 @@ def _fields_by_segment(
             if b.segment_id in by_native
         ] or by_pages.get((content.start_page_number, content.end_page_number), [])
 
-        owner = next(
-            (c.segment_id for c in candidates if wanted and c.content_type is wanted),
-            candidates[0].segment_id if candidates else None,
-        )
-        if owner:
-            out[owner] = fields
-        else:
-            log.warning(
-                "routed fields on pages %s-%s match no segment; they will be dropped",
-                content.start_page_number,
-                content.end_page_number,
-            )
+        candidates = list({candidate.segment_id: candidate for candidate in candidates
+                           if wanted and candidate.content_type is wanted}.values())
+        if len(candidates) != 1:
+            raise ValueError("Routed CU fields have missing or ambiguous segment ownership; inspect the native response")
+        owner = candidates[0].segment_id
+        if owner in out:
+            raise ValueError(f"Multiple CU field results target {owner}; refusing to overwrite fields")
+        out[owner] = fields
     return out
 
 
@@ -459,9 +486,11 @@ def _regions_for(
     """Group this segment's claims into one region per (page, kind)."""
     grouped: dict[tuple[int, ContentType], list[tuple[int, int]]] = {}
     for offset, length, page, kind in claims:
-        if kind is None or offset < start or offset >= end:
+        clipped_start = max(offset, start)
+        clipped_end = min(offset + length, end)
+        if kind is None or clipped_start >= clipped_end:
             continue
-        grouped.setdefault((page, kind), []).append((offset, length))
+        grouped.setdefault((page, kind), []).append((clipped_start, clipped_end - clipped_start))
 
     regions = [
         Region(
