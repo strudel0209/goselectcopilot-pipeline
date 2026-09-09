@@ -47,8 +47,12 @@ including their ratings, certificates and warranties.
 Consider every field in the supplied customer schema. Populate it only when its meaning
 applies to the component. Preserve other relevant requirements in appropriate details
 or notes, naming the component. Do not force non-VFD specifications into VFD-only fields.
-Preserve stated values, units and qualifiers. Minimum or maximum ratings are not actual
-operating values. Leave unknown fields null or empty. Retain conflicting statements
+Preserve stated values, units and qualifiers. Populate input_current or
+output_current only when the source establishes that specific meaning.
+An unqualified minimum controller ampere rating does not establish either:
+preserve it with its qualifier in notes instead. Never substitute a breaker
+rating or minimum controller rating for motor FLA.
+Leave unknown fields null or empty. Retain conflicting statements
 with their source contexts and flag them instead of silently choosing or averaging.
 
 Support populated fields and list items with evidence: supplied source IDs, verbatim
@@ -58,6 +62,15 @@ Do not invent quotes or claim that one quote supports details it does not contai
 
 For drawings, use overviews to trace connections and detail tiles to read labels.
 Confirm spatial relationships against images rather than relying on OCR word order.
+Trace each controller's incoming connection to its labelled supply, accounting
+for intervening transformers or conversion equipment. Record supported connected
+supply voltage and phases with their source context, distinguishing them from
+equipment nameplate ratings and specification requirements. Do not transfer
+upstream enclosure, interrupting or protective-device ratings to the controller.
+
+Before returning, check each identified branch for motor-symbol ratings and
+applicable drawing notes. Preserve readable values whose meaning is supported;
+leave unconfirmed units null and describe the uncertainty.
 Cite the supplied source IDs, not guessed page numbers.
 
 Put requirements whose applicability remains uncertain in unresolved_requirements,
